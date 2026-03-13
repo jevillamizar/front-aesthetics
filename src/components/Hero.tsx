@@ -4,9 +4,11 @@ import { Star, Award, Clock, Users, ArrowRight } from 'lucide-react';
 
 type HeroProps = {
   onBook?: () => void;
+  headline?: string;
+  description?: string;
 };
 
-export function Hero({ onBook }: HeroProps) {
+export function Hero({ onBook, headline, description }: HeroProps) {
   const containerVariants = {
     hidden: {
       opacity: 0
@@ -58,17 +60,23 @@ export function Hero({ onBook }: HeroProps) {
             variants={itemVariants}
             className="text-5xl md:text-7xl font-light tracking-tight text-[#2D2D2D] mb-6 leading-[1.1]">
 
-            Revela tu <br />
-            <span className="font-serif italic text-[#8B9E8B]">
-              Resplandor natural
-            </span>
+            {headline ? (
+              headline
+            ) : (
+              <>
+                Revela tu <br />
+                <span className="font-serif italic text-[var(--primary)]">Resplandor natural</span>
+              </>
+            )}
           </motion.h1>
 
           <motion.p
             variants={itemVariants}
             className="text-lg md:text-xl text-[#6B6B6B] mb-10 max-w-2xl mx-auto leading-relaxed">
 
-            Experimenta el equilibrio perfecto entre la experiencia médica y la visión artística. Nos especializamos en tratamientos sutiles y transformadores que realzan tu belleza única.
+            {description
+              ? description
+              : 'Experimenta el equilibrio perfecto entre la experiencia médica y la visión artística. Nos especializamos en tratamientos sutiles y transformadores que realzan tu belleza única.'}
           </motion.p>
 
           <motion.div
