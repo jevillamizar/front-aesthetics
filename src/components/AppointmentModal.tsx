@@ -8,15 +8,26 @@ type AppointmentModalProps = {
   onClose: () => void;
 };
 
+type TreatmentOption = {
+  id: number;
+  name: string;
+  slug: string | null;
+  duration_minutes: number;
+  price: string;
+};
+
 export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [treatments, setTreatments] = useState<TreatmentOption[]>([]);
+  const [treatmentsLoading, setTreatmentsLoading] = useState(false);
 
-  const apiBase = (import.meta as any).env?.VITE_API_BASE ?? '';
+  const apiBase = import.meta.env.VITE_API_BASE ?? '';
   const endpoint = `${String(apiBase).replace(/\/$/, '')}/public/appointments/`;
+  const treatmentsEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/treatments/`;
 
   useEffect(() => {
     if (!open) return;
@@ -34,14 +45,31 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
       panelRef.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus();
     });
 
+    setTreatmentsLoading(true);
+    fetch(treatmentsEndpoint, {
+      method: 'GET'
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return;
+        const results = Array.isArray(data?.results) ? data.results : [];
+        setTreatments(results);
+      })
+      .catch(() => {
+        // ignore: we keep static select usable even if network fails
+      })
+      .finally(() => setTreatmentsLoading(false));
+
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = prevOverflow;
       setSubmitted(false);
       setLoading(false);
       setError(null);
+      setTreatments([]);
+      setTreatmentsLoading(false);
     };
-  }, [open, onClose]);
+  }, [open, onClose, treatmentsEndpoint]);
 
   return (
     <AnimatePresence>
@@ -132,7 +160,18 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
 
                       const endsLocal = new Date(startsLocal.getTime() + (Number.isFinite(durationMinutes) ? durationMinutes : 60) * 60 * 1000);
 
-                      const payload: Record<string, any> = {
+                      const payload: {
+                        patient: {
+                          first_name: string;
+                          last_name: string;
+                          phone: string;
+                          email: string;
+                        };
+                        starts_at: string;
+                        ends_at: string;
+                        notes: string;
+                        treatment_slug?: string;
+                      } = {
                         patient: {
                           first_name: firstName,
                           last_name: lastName,
@@ -229,11 +268,14 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                         <select
                           name="treatment_slug"
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white">
-                          <option value="">Seleccionar</option>
-                          <option value="faciales">Faciales</option>
-                          <option value="inyectables">Inyectables</option>
-                          <option value="contorno-corporal">Contorno corporal</option>
-                          <option value="rejuvenecimiento">Rejuvenecimiento cutáneo</option>
+                          <option value="">{treatmentsLoading ? 'Cargando...' : 'Seleccionar'}</option>
+                          {treatments
+                            .filter((t) => Boolean(t.slug))
+                            .map((t) => (
+                              <option key={t.id} value={String(t.slug)}>
+                                {t.name}
+                              </option>
+                            ))}
                         </select>
                       </div>
 
