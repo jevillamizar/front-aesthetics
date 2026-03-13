@@ -12,6 +12,11 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const apiBase = (import.meta as any).env?.VITE_API_BASE ?? '';
+  const endpoint = `${String(apiBase).replace(/\/$/, '')}/public/appointments/`;
 
   useEffect(() => {
     if (!open) return;
@@ -33,6 +38,8 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = prevOverflow;
       setSubmitted(false);
+      setLoading(false);
+      setError(null);
     };
   }, [open, onClose]);
 
@@ -88,27 +95,121 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                 {!submitted ? (
                   <form
                     className="grid grid-cols-1 gap-4"
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
-                      setSubmitted(true);
-                      window.setTimeout(() => onClose(), 700);
+                      setError(null);
+                      setLoading(true);
+
+                      const formData = new FormData(e.currentTarget);
+                      const firstName = String(formData.get('first_name') ?? '').trim();
+                      const lastName = String(formData.get('last_name') ?? '').trim();
+                      const phone = String(formData.get('phone') ?? '').trim();
+                      const email = String(formData.get('email') ?? '').trim();
+                      const treatmentSlug = String(formData.get('treatment_slug') ?? '').trim();
+                      const date = String(formData.get('date') ?? '').trim();
+                      const time = String(formData.get('time') ?? '').trim();
+                      const durationMinutes = Number(formData.get('duration_minutes') ?? 60);
+                      const notes = String(formData.get('notes') ?? '').trim();
+
+                      if (!firstName || !lastName || !email) {
+                        setError('Por favor completa nombre, apellido y email.');
+                        setLoading(false);
+                        return;
+                      }
+
+                      if (!date || !time) {
+                        setError('Por favor selecciona fecha y hora.');
+                        setLoading(false);
+                        return;
+                      }
+
+                      const startsLocal = new Date(`${date}T${time}:00`);
+                      if (Number.isNaN(startsLocal.getTime())) {
+                        setError('Fecha/hora inválida.');
+                        setLoading(false);
+                        return;
+                      }
+
+                      const endsLocal = new Date(startsLocal.getTime() + (Number.isFinite(durationMinutes) ? durationMinutes : 60) * 60 * 1000);
+
+                      const payload: Record<string, any> = {
+                        patient: {
+                          first_name: firstName,
+                          last_name: lastName,
+                          phone,
+                          email
+                        },
+                        starts_at: startsLocal.toISOString(),
+                        ends_at: endsLocal.toISOString(),
+                        notes
+                      };
+
+                      if (treatmentSlug) {
+                        payload.treatment_slug = treatmentSlug;
+                      }
+
+                      try {
+                        const res = await fetch(endpoint, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify(payload)
+                        });
+
+                        const data = await res.json().catch(() => null);
+                        if (!res.ok) {
+                          setError(String(data?.detail ?? 'No se pudo agendar la cita.'));
+                          setLoading(false);
+                          return;
+                        }
+
+                        setSubmitted(true);
+                        setLoading(false);
+                        window.setTimeout(() => onClose(), 900);
+                      } catch {
+                        setError('Error de red. Intenta nuevamente.');
+                        setLoading(false);
+                      }
                     }}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-[#6B6B6B]">Nombre</label>
                         <input
-                          name="name"
+                          name="first_name"
                           required
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
                           placeholder="Tu nombre" />
                       </div>
 
                       <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-[#6B6B6B]">Apellido</label>
+                        <input
+                          name="last_name"
+                          required
+                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
+                          placeholder="Tu apellido" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-[#6B6B6B]">Teléfono</label>
                         <input
                           name="phone"
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
                           placeholder="(###) ###-####" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-[#6B6B6B]">Duración (min)</label>
+                        <input
+                          name="duration_minutes"
+                          type="number"
+                          min={15}
+                          step={15}
+                          defaultValue={60}
+                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
+                        />
                       </div>
                     </div>
 
@@ -126,42 +227,61 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-[#6B6B6B]">Servicio</label>
                         <select
-                          name="service"
+                          name="treatment_slug"
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white">
                           <option value="">Seleccionar</option>
-                          <option value="facial">Faciales</option>
-                          <option value="injectables">Inyectables</option>
-                          <option value="body">Contorno corporal</option>
-                          <option value="skin">Rejuvenecimiento cutáneo</option>
+                          <option value="faciales">Faciales</option>
+                          <option value="inyectables">Inyectables</option>
+                          <option value="contorno-corporal">Contorno corporal</option>
+                          <option value="rejuvenecimiento">Rejuvenecimiento cutáneo</option>
                         </select>
                       </div>
 
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-[#6B6B6B]">Preferencia</label>
-                        <select
+                        <label className="text-xs font-medium text-[#6B6B6B]">Fecha</label>
+                        <input
+                          name="date"
+                          type="date"
+                          required
+                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-[#6B6B6B]">Hora</label>
+                        <input
                           name="time"
-                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white">
-                          <option value="">Horario</option>
-                          <option value="am">Mañana</option>
-                          <option value="pm">Tarde</option>
-                        </select>
+                          type="time"
+                          required
+                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white"
+                        />
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-[#6B6B6B]">Mensaje (opcional)</label>
+                      <label className="text-xs font-medium text-[#6B6B6B]">Notas (opcional)</label>
                       <textarea
-                        name="message"
+                        name="notes"
                         rows={4}
                         className="rounded-xl border border-[#EAEAEA] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] resize-none"
                         placeholder="Cuéntanos qué te gustaría lograr" />
                     </div>
 
+                    {error && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {error}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-end gap-3 pt-2">
                       <Button type="button" variant="ghost" onClick={onClose}>
                         Cancelar
                       </Button>
-                      <Button type="submit">Enviar</Button>
+                      <Button type="submit" disabled={loading}>
+                        {loading ? 'Enviando...' : 'Enviar'}
+                      </Button>
                     </div>
                   </form>
                 ) : (
