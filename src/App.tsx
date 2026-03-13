@@ -61,6 +61,7 @@ export function App() {
   const logoUrl = landingData?.landing?.logo_url?.trim() || '';
   const heroHeadline = landingData?.landing?.headline?.trim() || undefined;
   const heroDescription = landingData?.landing?.description?.trim() || undefined;
+  const heroImageUrl = landingData?.landing?.hero_image_url?.trim() || undefined;
 
   return (
     <div
@@ -124,6 +125,7 @@ export function App() {
           onBook={() => setAppointmentOpen(true)}
           headline={heroHeadline}
           description={heroDescription}
+          heroImageUrl={heroImageUrl}
         />
         <Services />
         <About />

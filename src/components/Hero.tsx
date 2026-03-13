@@ -6,9 +6,10 @@ type HeroProps = {
   onBook?: () => void;
   headline?: string;
   description?: string;
+  heroImageUrl?: string;
 };
 
-export function Hero({ onBook, headline, description }: HeroProps) {
+export function Hero({ onBook, headline, description, heroImageUrl }: HeroProps) {
   const containerVariants = {
     hidden: {
       opacity: 0
@@ -40,6 +41,16 @@ export function Hero({ onBook, headline, description }: HeroProps) {
       {/* Abstract Background Elements */}
       <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-[#E8ECE8] to-transparent opacity-60" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#8B9E8B]/5 rounded-full blur-3xl" />
+
+      {heroImageUrl ? (
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0 bg-center bg-cover"
+            style={{ backgroundImage: `url(${heroImageUrl})` }}
+          />
+          <div className="absolute inset-0 bg-[#F5F5F3]/80" />
+        </div>
+      ) : null}
 
       <div className="container mx-auto px-4 md:px-6 relative z-10">
         <motion.div
