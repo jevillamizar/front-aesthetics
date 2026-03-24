@@ -18,6 +18,9 @@ type LandingPayload = {
     headline: string;
     description: string;
     primary_color: string;
+    font_heading: string;
+    font_body: string;
+    font_accent: string;
     logo_url: string;
     hero_image_url: string;
     trust_indicators: Array<{ icon: string; label: string; sub: string }>;
@@ -51,14 +54,39 @@ export function App() {
       });
   }, [landingEndpoint]);
 
+  const fontHeading = landingData?.landing?.font_heading?.trim() || '';
+  const fontBody = landingData?.landing?.font_body?.trim() || '';
+  const fontAccent = landingData?.landing?.font_accent?.trim() || '';
+
+  useEffect(() => {
+    const families = [fontHeading, fontBody, fontAccent].filter(Boolean);
+    if (families.length === 0) return;
+
+    const id = 'dynamic-google-fonts';
+    const existing = document.getElementById(id);
+    if (existing) existing.remove();
+
+    const params = families.map((f) => `family=${f.replace(/ /g, '+')}:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600`).join('&');
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${params}&display=swap`;
+    document.head.appendChild(link);
+
+    return () => { link.remove(); };
+  }, [fontHeading, fontBody, fontAccent]);
+
   const themeStyle = useMemo(() => {
     const primary = landingData?.landing?.primary_color?.trim() || '#8B9E8B';
     const primaryHover = '#7A8D7A';
     return {
       '--primary': primary,
-      '--primary_hover': primaryHover
+      '--primary_hover': primaryHover,
+      '--font-heading': fontHeading ? `'${fontHeading}', serif` : undefined,
+      '--font-body': fontBody ? `'${fontBody}', sans-serif` : undefined,
+      '--font-accent': fontAccent ? `'${fontAccent}', serif` : undefined,
     } as React.CSSProperties;
-  }, [landingData]);
+  }, [landingData, fontHeading, fontBody, fontAccent]);
 
   const brandName = landingData?.clinic?.name || 'Lumina Aesthetics';
   const logoUrl = landingData?.landing?.logo_url?.trim() || '';
@@ -69,22 +97,23 @@ export function App() {
 
   return (
     <div
-      className="min-h-screen bg-[#F5F5F3] font-sans text-[#2D2D2D]"
-      style={themeStyle}>
+      className="min-h-screen bg-[#F5F5F3] text-[#2D2D2D]"
+      style={{ ...themeStyle, fontFamily: fontBody ? `'${fontBody}', sans-serif` : undefined }}
+      >
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F5F5F3]">
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
-          <a href="#home" className="text-2xl font-serif italic text-[#2D2D2D]">
+          <a href="#home" className="inline-flex items-center gap-3 shrink-0">
             {logoUrl ? (
-              <span className="inline-flex items-center gap-3">
-                <img src={logoUrl} alt={brandName} className="h-10 w-10 rounded-full object-cover" />
-                <span className="not-italic font-sans text-base md:text-lg">{brandName}</span>
-              </span>
-            ) : (
               <>
+                <img src={logoUrl} alt={brandName} className="h-12 max-h-12 w-auto object-contain rounded-xl" />
+                <span className="text-base md:text-lg font-medium text-[#2D2D2D] hidden sm:inline">{brandName}</span>
+              </>
+            ) : (
+              <span className="text-2xl font-serif italic text-[#2D2D2D]">
                 {brandName.split(' ')[0] ?? brandName}{' '}
                 <span className="text-[var(--primary)]">{brandName.split(' ').slice(1).join(' ') || 'Aesthetics'}</span>
-              </>
+              </span>
             )}
           </a>
 

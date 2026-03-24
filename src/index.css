@@ -11,19 +11,20 @@
   }
   
   body {
-    @apply font-sans antialiased;
+    @apply antialiased;
+    font-family: var(--font-body, 'Inter', system-ui, sans-serif);
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply tracking-tight;
+    font-family: var(--font-heading, 'Playfair Display', serif);
   }
 }
 
-/* Custom font family utilities since we can't edit tailwind.config.js easily */
 .font-sans {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-body, 'Inter', system-ui, sans-serif);
 }
 
 .font-serif {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-accent, 'Playfair Display', serif);
 }
