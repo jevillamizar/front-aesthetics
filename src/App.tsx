@@ -29,6 +29,13 @@ type LandingPayload = {
     hero_image_url: string;
     trust_indicators: Array<{ icon: string; label: string; sub: string }>;
     testimonials: Array<{ name: string; treatment: string; rating: number; quote: string }>;
+    about_title: string;
+    about_subtitle: string;
+    about_description: string;
+    about_bullets: string[];
+    about_image_url: string;
+    about_badge_title: string;
+    about_badge_text: string;
     phone: string;
     email: string;
     whatsapp_phone: string;
@@ -178,7 +185,7 @@ export function App() {
           trustIndicators={trustIndicators}
         />
         <Services />
-        <About />
+        <About landing={landingData?.landing ?? undefined} />
         <Testimonials testimonials={landingData?.landing?.testimonials} />
         <Contact
           onBook={() => setAppointmentOpen(true)}
