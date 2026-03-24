@@ -25,7 +25,9 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
   const [treatments, setTreatments] = useState<TreatmentOption[]>([]);
   const [treatmentsLoading, setTreatmentsLoading] = useState(false);
 
-  const apiBase = import.meta.env.VITE_API_BASE ?? '';
+  const apiBase =
+    (import.meta.env.VITE_API_BASE ?? '').trim() ||
+    `${window.location.protocol}//${window.location.hostname}:8000`;
   const endpoint = `${String(apiBase).replace(/\/$/, '')}/public/appointments/`;
   const treatmentsEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/treatments/`;
 

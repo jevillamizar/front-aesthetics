@@ -32,7 +32,9 @@ export function App() {
   const [appointmentOpen, setAppointmentOpen] = useState(false);
   const [landingData, setLandingData] = useState<LandingPayload | null>(null);
 
-  const apiBase = import.meta.env.VITE_API_BASE ?? '';
+  const apiBase =
+    (import.meta.env.VITE_API_BASE ?? '').trim() ||
+    `${window.location.protocol}//${window.location.hostname}:8000`;
   const landingEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/landing/`;
 
   useEffect(() => {
