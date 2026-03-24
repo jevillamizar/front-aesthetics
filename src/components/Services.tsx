@@ -1,99 +1,83 @@
-import React, { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Syringe, User, Sun } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
-const services = [
-{
-  id: 'facial',
-  label: 'Tratamientos Faciales',
-  icon: Sparkles,
-  items: [
-  {
-    name: 'HydraFacial Élite',
-    price: '$199 - $299',
-    desc: 'Limpieza profunda, extracción e hidratación con sueros potentes ricos en antioxidantes.'
-  },
-  {
-    name: 'Quemadores de Piel',
-    price: '$150 - $350',
-    desc: 'Exfoliación avanzada para mejorar la textura, el tono y la claridad de la piel para un brillo radiante.'
-  },
-  {
-    name: 'Microneedling',
-    price: '$350 - $500',
-    desc: 'Terapia de inducción de colágeno para reducir líneas finas, cicatrices de acné y el tamaño de los poros.'
-  }]
 
-},
-{
-  id: 'injectables',
-  label: 'Inyectables',
-  icon: Syringe,
-  items: [
-  {
-    name: 'Botox & Dysport',
-    price: '$12 - $14 / unit',
-    desc: 'Relaja los músculos faciales para suavizar arrugas y prevenir la formación de líneas finas.'
-  },
-  {
-    name: 'Dermal Fillers',
-    price: '$650 - $850',
-    desc: 'Restaura volumen y define contornos en pómulos, labios y mandíbula para un perfil juvenil.'
-  },
-  {
-    name: 'Kybella',
-    price: '$600 / vial',
-    desc: 'Tratamiento no quirúrgico para destruir células grasas bajo el mentón y lograr un perfil definido.'
-  }]
+type TreatmentItem = {
+  id: number;
+  name: string;
+  slug: string | null;
+  category: string;
+  description: string;
+  duration_minutes: number;
+  price: string;
+};
 
-},
-{
-  id: 'body',
-  label: 'Contorno Corporal',
-  icon: User,
-  items: [
-  {
-    name: 'CoolSculpting',
-    price: 'Consultation Required',
-    desc: 'Elimina las células grasas rebeldes con congelación, sin tiempo de recuperación y con resultados duraderos.'
-  },
-  {
-    name: 'EmSculpt NEO',
-    price: '$850 / session',
-    desc: 'Construye músculo y quema grasa simultáneamente mediante energía electromagnética.'
-  },
-  {
-    name: 'Laser Hair Removal',
-    price: '$100 - $500',
-    desc: 'Reducción permanente del vello para una piel suave en todas las zonas del cuerpo.'
-  }]
+type CategoryGroup = {
+  id: string;
+  label: string;
+  items: TreatmentItem[];
+};
 
-},
-{
-  id: 'skin',
-  label: 'Rejuvenecimiento Cutáneo',
-  icon: Sun,
-  items: [
-  {
-    name: 'IPL Photofacial',
-    price: '$300 - $450',
-    desc: 'Trata el daño solar, la rosácea y la hiperpigmentación con luz pulsada intensa.'
-  },
-  {
-    name: 'Laser Resurfacing',
-    price: '$800 - $1,500',
-    desc: 'Renovación profunda de la piel para tratar arrugas marcadas, cicatrices y textura irregular.'
-  },
-  {
-    name: 'PRP Therapy',
-    price: '$500 - $700',
-    desc: 'Utiliza tus propias plaquetas para estimular el colágeno y rejuvenecer la piel de forma natural.'
-  }]
+function groupByCategory(treatments: TreatmentItem[]): CategoryGroup[] {
+  const map = new Map<string, TreatmentItem[]>();
+  for (const t of treatments) {
+    const cat = t.category?.trim() || 'General';
+    const list = map.get(cat) ?? [];
+    if (!map.has(cat)) map.set(cat, list);
+    list.push(t);
+  }
+  return Array.from(map.entries()).map(([label, items]) => ({
+    id: label.toLowerCase().replace(/\s+/g, '-'),
+    label,
+    items,
+  }));
+}
 
-}];
+function formatPrice(price: string | number): string {
+  const n = typeof price === 'string' ? parseFloat(price) : price;
+  if (isNaN(n) || n === 0) return 'Consultar';
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
 
 export function Services() {
-  const [activeTab, setActiveTab] = useState(services[0].id);
+  const [treatments, setTreatments] = useState<TreatmentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const apiBase =
+    (import.meta.env.VITE_API_BASE ?? '').trim() ||
+    `${window.location.protocol}//${window.location.hostname}:8000`;
+  const endpoint = `${String(apiBase).replace(/\/$/, '')}/public/treatments/`;
+
+  useEffect(() => {
+    fetch(endpoint, { method: 'GET' })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data) return;
+        const results: TreatmentItem[] = Array.isArray(data.results) ? data.results : [];
+        setTreatments(results);
+      })
+      .catch(() => { /* network error: section stays hidden */ })
+      .finally(() => setLoading(false));
+  }, [endpoint]);
+
+  const categories = useMemo(() => groupByCategory(treatments), [treatments]);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+
+  const currentTab = activeTab ?? categories[0]?.id ?? null;
+
+  if (loading) {
+    return (
+      <section className="py-24 bg-white" id="services">
+        <div className="container mx-auto px-4 md:px-6 text-center text-[#6B6B6B]">
+          Cargando tratamientos…
+        </div>
+      </section>
+    );
+  }
+
+  if (categories.length === 0) return null;
+
   return (
     <section className="py-24 bg-white" id="services">
       <div className="container mx-auto px-4 md:px-6">
@@ -107,43 +91,44 @@ export function Services() {
           </p>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="flex flex-wrap justify-center gap-2 mb-12">
-          {services.map((service) =>
-          <button
-            key={service.id}
-            onClick={() => setActiveTab(service.id)}
-            className={cn(
-              'relative px-6 py-3 rounded-full text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#8B9E8B]',
-              activeTab === service.id ?
-              'text-white' :
-              'text-[#6B6B6B] hover:text-[#2D2D2D]'
-            )}>
+        {/* Tabs Navigation — only if more than 1 category */}
+        {categories.length > 1 && (
+          <div className="flex flex-wrap justify-center gap-2 mb-12">
+            {categories.map((cat) =>
+            <button
+              key={cat.id}
+              onClick={() => setActiveTab(cat.id)}
+              className={cn(
+                'relative px-6 py-3 rounded-full text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#8B9E8B]',
+                currentTab === cat.id ?
+                'text-white' :
+                'text-[#6B6B6B] hover:text-[#2D2D2D]'
+              )}>
 
-              {activeTab === service.id &&
-            <motion.div
-              layoutId="activeTab"
-              className="absolute inset-0 bg-[#8B9E8B] rounded-full"
-              transition={{
-                type: 'spring',
-                bounce: 0.2,
-                duration: 0.6
-              }} />
-
-            }
-              <span className="relative z-10 flex items-center gap-2">
-                <service.icon className="w-4 h-4" />
-                {service.label}
-              </span>
-            </button>
-          )}
-        </div>
+                {currentTab === cat.id &&
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-[#8B9E8B] rounded-full"
+                transition={{
+                  type: 'spring',
+                  bounce: 0.2,
+                  duration: 0.6
+                }} />
+              }
+                <span className="relative z-10 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  {cat.label}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Services Grid */}
         <div className="min-h-[400px]">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab}
+              key={currentTab}
               initial={{
                 opacity: 0,
                 y: 20
@@ -161,11 +146,11 @@ export function Services() {
               }}
               className="grid grid-cols-1 md:grid-cols-3 gap-8">
 
-              {services.
-              find((s) => s.id === activeTab)?.
-              items.map((item, index) =>
+              {categories
+                .find((c) => c.id === currentTab)
+                ?.items.map((item, index) =>
               <motion.div
-                key={item.name}
+                key={item.id}
                 initial={{
                   opacity: 0,
                   y: 20
@@ -185,14 +170,14 @@ export function Services() {
                       </h3>
                     </div>
                     <p className="text-[#6B6B6B] text-sm leading-relaxed mb-6 min-h-[60px]">
-                      {item.desc}
+                      {item.description}
                     </p>
                     <div className="pt-4 border-t border-[#8B9E8B]/10 flex justify-between items-center">
                       <span className="text-sm font-medium text-[#8B9E8B]">
-                        {item.price}
+                        {formatPrice(item.price)}
                       </span>
                       <span className="text-xs text-[#6B6B6B] uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
-                        Learn More
+                        {item.duration_minutes} min
                       </span>
                     </div>
                   </motion.div>
