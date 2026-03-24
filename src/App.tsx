@@ -18,6 +18,10 @@ type LandingPayload = {
     headline: string;
     description: string;
     primary_color: string;
+    secondary_color: string;
+    accent_color: string;
+    background_color: string;
+    text_color: string;
     font_heading: string;
     font_body: string;
     font_accent: string;
@@ -77,11 +81,20 @@ export function App() {
   }, [fontHeading, fontBody, fontAccent]);
 
   const themeStyle = useMemo(() => {
-    const primary = landingData?.landing?.primary_color?.trim() || '#8B9E8B';
-    const primaryHover = '#7A8D7A';
+    const l = landingData?.landing;
+    const primary = l?.primary_color?.trim() || '#8B9E8B';
+    const secondary = l?.secondary_color?.trim() || '#F5F5F3';
+    const accent = l?.accent_color?.trim() || '#D4A574';
+    const bg = l?.background_color?.trim() || '#F5F5F3';
+    const text = l?.text_color?.trim() || '#2D2D2D';
     return {
       '--primary': primary,
-      '--primary_hover': primaryHover,
+      '--primary-hover': `color-mix(in srgb, ${primary} 85%, black)`,
+      '--secondary': secondary,
+      '--accent': accent,
+      '--background': bg,
+      '--text': text,
+      '--text-muted': `color-mix(in srgb, ${text} 55%, ${bg})`,
       '--font-heading': fontHeading ? `'${fontHeading}', serif` : undefined,
       '--font-body': fontBody ? `'${fontBody}', sans-serif` : undefined,
       '--font-accent': fontAccent ? `'${fontAccent}', serif` : undefined,
@@ -97,8 +110,8 @@ export function App() {
 
   return (
     <div
-      className="min-h-screen bg-[#F5F5F3] text-[#2D2D2D]"
-      style={{ ...themeStyle, fontFamily: fontBody ? `'${fontBody}', sans-serif` : undefined }}
+      className="min-h-screen"
+      style={{ ...themeStyle, backgroundColor: 'var(--background)', color: 'var(--text)', fontFamily: fontBody ? `'${fontBody}', sans-serif` : undefined }}
       >
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F5F5F3]">
@@ -107,10 +120,10 @@ export function App() {
             {logoUrl ? (
               <>
                 <img src={logoUrl} alt={brandName} className="h-12 max-h-12 w-auto object-contain rounded-xl" />
-                <span className="text-base md:text-lg font-medium text-[#2D2D2D] hidden sm:inline">{brandName}</span>
+                <span className="text-base md:text-lg font-medium hidden sm:inline" style={{ color: 'var(--text)' }}>{brandName}</span>
               </>
             ) : (
-              <span className="text-2xl font-serif italic text-[#2D2D2D]">
+              <span className="text-2xl font-serif italic" style={{ color: 'var(--text)' }}>
                 {brandName.split(' ')[0] ?? brandName}{' '}
                 <span className="text-[var(--primary)]">{brandName.split(' ').slice(1).join(' ') || 'Aesthetics'}</span>
               </span>
@@ -120,25 +133,25 @@ export function App() {
           <div className="hidden md:flex items-center gap-8">
             <a
               href="#services"
-              className="text-sm font-medium text-[#6B6B6B] hover:text-[#8B9E8B] transition-colors">
+              className="nav-link text-sm font-medium transition-colors">
 
               Tratamientos
             </a>
             <a
               href="#about"
-              className="text-sm font-medium text-[#6B6B6B] hover:text-[#8B9E8B] transition-colors">
+              className="nav-link text-sm font-medium transition-colors">
 
               Sobre Nosotros
             </a>
             <a
               href="#testimonials"
-              className="text-sm font-medium text-[#6B6B6B] hover:text-[#8B9E8B] transition-colors">
+              className="nav-link text-sm font-medium transition-colors">
 
               Reseñas
             </a>
             <a
               href="#contact"
-              className="text-sm font-medium text-[#6B6B6B] hover:text-[#8B9E8B] transition-colors">
+              className="nav-link text-sm font-medium transition-colors">
 
               Contacto
             </a>
@@ -147,7 +160,7 @@ export function App() {
             </Button>
           </div>
 
-          <button className="md:hidden p-2 text-[#2D2D2D]">
+          <button className="md:hidden p-2" style={{ color: 'var(--text)' }}>
             <Menu className="w-6 h-6" />
           </button>
         </div>

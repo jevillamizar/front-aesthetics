@@ -28,3 +28,10 @@
 .font-serif {
   font-family: var(--font-accent, 'Playfair Display', serif);
 }
+
+.nav-link {
+  color: var(--text-muted, #6B6B6B);
+}
+.nav-link:hover {
+  color: var(--primary, #8B9E8B);
+}
