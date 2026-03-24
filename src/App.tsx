@@ -28,6 +28,9 @@ type LandingPayload = {
     logo_url: string;
     hero_image_url: string;
     trust_indicators: Array<{ icon: string; label: string; sub: string }>;
+    testimonials: Array<{ name: string; treatment: string; rating: number; quote: string }>;
+    phone: string;
+    email: string;
     whatsapp_phone: string;
     booking_url: string;
     instagram_url: string;
@@ -176,8 +179,12 @@ export function App() {
         />
         <Services />
         <About />
-        <Testimonials />
-        <Contact onBook={() => setAppointmentOpen(true)} />
+        <Testimonials testimonials={landingData?.landing?.testimonials} />
+        <Contact
+          onBook={() => setAppointmentOpen(true)}
+          brandName={brandName}
+          landing={landingData?.landing ?? undefined}
+        />
       </main>
 
       <AppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} />
