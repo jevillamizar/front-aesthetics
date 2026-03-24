@@ -20,6 +20,7 @@ type LandingPayload = {
     primary_color: string;
     logo_url: string;
     hero_image_url: string;
+    trust_indicators: Array<{ icon: string; label: string; sub: string }>;
     whatsapp_phone: string;
     booking_url: string;
     instagram_url: string;
@@ -64,6 +65,7 @@ export function App() {
   const heroHeadline = landingData?.landing?.headline?.trim() || undefined;
   const heroDescription = landingData?.landing?.description?.trim() || undefined;
   const heroImageUrl = landingData?.landing?.hero_image_url?.trim() || undefined;
+  const trustIndicators = landingData?.landing?.trust_indicators;
 
   return (
     <div
@@ -128,6 +130,7 @@ export function App() {
           headline={heroHeadline}
           description={heroDescription}
           heroImageUrl={heroImageUrl}
+          trustIndicators={trustIndicators}
         />
         <Services />
         <About />

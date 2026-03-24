@@ -1,15 +1,42 @@
 import { motion } from 'framer-motion';
 import { Button } from './ui/Button';
-import { Star, Award, Clock, Users, ArrowRight } from 'lucide-react';
+import { Star, Award, Clock, Users, ArrowRight, type LucideIcon, Heart, Shield, Zap, ThumbsUp, TrendingUp, CheckCircle } from 'lucide-react';
+
+type TrustIndicator = {
+  icon: string;
+  label: string;
+  sub: string;
+};
 
 type HeroProps = {
   onBook?: () => void;
   headline?: string;
   description?: string;
   heroImageUrl?: string;
+  trustIndicators?: TrustIndicator[];
 };
 
-export function Hero({ onBook, headline, description, heroImageUrl }: HeroProps) {
+const iconMap: Record<string, LucideIcon> = {
+  clock: Clock,
+  award: Award,
+  users: Users,
+  star: Star,
+  heart: Heart,
+  shield: Shield,
+  zap: Zap,
+  thumbsup: ThumbsUp,
+  trending: TrendingUp,
+  check: CheckCircle,
+};
+
+const defaultIndicators: TrustIndicator[] = [
+  { icon: 'clock', label: '15+ Años', sub: 'Experiencia' },
+  { icon: 'award', label: 'Certificados', sub: 'Especialistas' },
+  { icon: 'users', label: '10k+', sub: 'Tratamientos' },
+  { icon: 'star', label: '5-Star Rated', sub: 'En Google' },
+];
+
+export function Hero({ onBook, headline, description, heroImageUrl, trustIndicators }: HeroProps) {
   const containerVariants = {
     hidden: {
       opacity: 0
@@ -108,39 +135,20 @@ export function Hero({ onBook, headline, description, heroImageUrl }: HeroProps)
             variants={itemVariants}
             className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-[#8B9E8B]/20 pt-12">
 
-            {[
-            {
-              icon: Clock,
-              label: '15+ Años',
-              sub: 'Experiencia'
-            },
-            {
-              icon: Award,
-              label: 'Certificados',
-              sub: 'Especialistas'
-            },
-            {
-              icon: Users,
-              label: '10k+',
-              sub: 'Tratamientos'
-            },
-            {
-              icon: Star,
-              label: '5-Star Rated',
-              sub: 'En Google'
-            }].
-            map((item, index) =>
-            <div
-              key={index}
-              className="flex flex-col items-center justify-center text-center">
-
-                <item.icon className="h-6 w-6 text-[#8B9E8B] mb-3" />
-                <span className="block text-lg font-medium text-[#2D2D2D]">
-                  {item.label}
-                </span>
-                <span className="text-sm text-[#6B6B6B]">{item.sub}</span>
-              </div>
-            )}
+            {(trustIndicators && trustIndicators.length > 0 ? trustIndicators : defaultIndicators).map((item, index) => {
+              const Icon = iconMap[(item.icon || '').toLowerCase()] || Star;
+              return (
+                <div
+                  key={index}
+                  className="flex flex-col items-center justify-center text-center">
+                  <Icon className="h-6 w-6 text-[#8B9E8B] mb-3" />
+                  <span className="block text-lg font-medium text-[#2D2D2D]">
+                    {item.label}
+                  </span>
+                  <span className="text-sm text-[#6B6B6B]">{item.sub}</span>
+                </div>
+              );
+            })}
           </motion.div>
         </motion.div>
       </div>
