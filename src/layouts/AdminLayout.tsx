@@ -3,7 +3,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import {
   LayoutDashboard,
-  Palette,
   Scissors,
   CalendarDays,
   Users,
@@ -15,7 +14,6 @@ import {
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/landing', icon: Palette, label: 'Landing Page', end: false },
   { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false },
   { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },
