@@ -31,6 +31,9 @@ export function TreatmentsAdmin() {
   const [editing, setEditing] = useState<FormData | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [newCategory, setNewCategory] = useState(false);
+
+  const existingCategories = [...new Set(treatments.map((t) => t.category).filter(Boolean))].sort();
 
   const load = async () => {
     try {
@@ -74,6 +77,7 @@ export function TreatmentsAdmin() {
       }
 
       setEditing(null);
+      setNewCategory(false);
       await load();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -157,13 +161,44 @@ export function TreatmentsAdmin() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                  <input
-                    type="text"
-                    value={editing.category}
-                    onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    placeholder="Inyectables"
-                  />
+                  {!newCategory ? (
+                    <select
+                      value={existingCategories.includes(editing.category) ? editing.category : ''}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setNewCategory(true);
+                          setEditing({ ...editing, category: '' });
+                        } else {
+                          setEditing({ ...editing, category: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <option value="">Selecciona una categoría</option>
+                      {existingCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="__new__">+ Nueva categoría...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editing.category}
+                        onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        placeholder="Nombre de la nueva categoría"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setNewCategory(false); setEditing({ ...editing, category: '' }); }}
+                        className="px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -213,7 +248,7 @@ export function TreatmentsAdmin() {
 
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
               <button
-                onClick={() => setEditing(null)}
+                onClick={() => { setEditing(null); setNewCategory(false); }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 Cancelar
