@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
-import { CalendarDays, Users, Scissors, TrendingUp, Loader2, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Users, Scissors, TrendingUp, Loader2, Clock, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react';
 
 type Stats = {
   appointments_today: number;
@@ -39,7 +39,9 @@ function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-function AppointmentList({ appts, emptyMsg }: { appts: Appt[]; emptyMsg: string }) {
+function AppointmentList({ appts, emptyMsg, now, onAtender }: {
+  appts: Appt[]; emptyMsg: string; now: number; onAtender: (id: number) => void;
+}) {
   if (appts.length === 0) return (
     <div className="px-6 py-10 text-center">
       <CalendarDays className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -68,6 +70,16 @@ function AppointmentList({ appts, emptyMsg }: { appts: Appt[]; emptyMsg: string 
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${st.color}`}>
               {st.label}
             </span>
+            {now >= new Date(a.starts_at).getTime() - 15 * 60 * 1000
+              && ['SCHEDULED', 'CONFIRMED'].includes(a.status) && (
+              <button
+                onClick={() => onAtender(a.id)}
+                className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors shrink-0"
+                title="Atender cita"
+              >
+                <Stethoscope className="w-4 h-4" />
+              </button>
+            )}
           </div>
         );
       })}
@@ -75,8 +87,9 @@ function AppointmentList({ appts, emptyMsg }: { appts: Appt[]; emptyMsg: string 
   );
 }
 
-function MonthCalendar({ appts, year, month, onPrev, onNext }: {
+function MonthCalendar({ appts, year, month, onPrev, onNext, now, onAtender }: {
   appts: Appt[]; year: number; month: number; onPrev: () => void; onNext: () => void;
+  now: number; onAtender: (id: number) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const today = new Date();
@@ -160,7 +173,7 @@ function MonthCalendar({ appts, year, month, onPrev, onNext }: {
           <p className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">
             {selectedDay} de {MONTH_NAMES[month]} — {selectedAppts.length} cita{selectedAppts.length !== 1 ? 's' : ''}
           </p>
-          <AppointmentList appts={selectedAppts} emptyMsg="Sin citas este día" />
+          <AppointmentList appts={selectedAppts} emptyMsg="Sin citas este día" now={now} onAtender={onAtender} />
         </div>
       )}
     </div>
@@ -173,6 +186,13 @@ export function DashboardHome() {
   const [allAppts, setAllAppts] = useState<Appt[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('day');
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
@@ -197,6 +217,17 @@ export function DashboardHome() {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
+  const handleAtender = useCallback(async (id: number) => {
+    await apiFetch(`/api/appointments/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'CONFIRMED' }),
+    });
+    const r = await apiFetch('/api/dashboard/');
+    const data = await r.json();
+    setStats(data.stats);
+    setAllAppts(data.upcoming_appointments ?? []);
+  }, []);
+
   const weekAppts = allAppts.filter((a) => {
     const d = new Date(a.starts_at);
     return d >= weekStart && d <= weekEnd;
@@ -265,14 +296,16 @@ export function DashboardHome() {
             <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
           </div>
         ) : tab === 'day' ? (
-          <AppointmentList appts={todayAppts} emptyMsg="Sin citas hoy" />
+          <AppointmentList appts={todayAppts} emptyMsg="Sin citas hoy" now={nowMs} onAtender={handleAtender} />
         ) : tab === 'week' ? (
-          <AppointmentList appts={weekAppts} emptyMsg="Sin citas esta semana" />
+          <AppointmentList appts={weekAppts} emptyMsg="Sin citas esta semana" now={nowMs} onAtender={handleAtender} />
         ) : (
           <MonthCalendar
             appts={allAppts}
             year={calYear}
             month={calMonth}
+            now={nowMs}
+            onAtender={handleAtender}
             onPrev={() => {
               if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
               else setCalMonth(m => m - 1);
