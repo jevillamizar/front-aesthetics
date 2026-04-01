@@ -86,6 +86,7 @@ export function AppointmentsAdmin() {
 
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
   const [editing, setEditing] = useState<FormData | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -102,13 +103,14 @@ export function AppointmentsAdmin() {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
       if (dateFilter) params.set('date', dateFilter);
+      if (patientFilter) params.set('patient_id', String(patientFilter));
       const res = await apiFetch(`/api/appointments/?${params}`);
       const json = await res.json();
       setAppointments(json.appointments || []);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, dateFilter]);
+  }, [statusFilter, dateFilter, patientFilter]);
 
   const loadMeta = async () => {
     const [pRes, tRes] = await Promise.all([
@@ -234,9 +236,19 @@ export function AppointmentsAdmin() {
           onChange={(e) => setDateFilter(e.target.value)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
         />
-        {(statusFilter || dateFilter) && (
+        <select
+          value={patientFilter}
+          onChange={(e) => setPatientFilter(Number(e.target.value) || '')}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
+        >
+          <option value="">Todos los pacientes</option>
+          {patients.map((p) => (
+            <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
+          ))}
+        </select>
+        {(statusFilter || dateFilter || patientFilter) && (
           <button
-            onClick={() => { setStatusFilter(''); setDateFilter(''); }}
+            onClick={() => { setStatusFilter(''); setDateFilter(''); setPatientFilter(''); }}
             className="px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             Limpiar
