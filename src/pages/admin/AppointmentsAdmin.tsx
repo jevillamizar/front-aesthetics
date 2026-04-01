@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
 import {
-  CalendarDays, Clock, Loader2, Pencil, Plus, Save, Trash2, X,
+  CalendarDays, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, X,
 } from 'lucide-react';
 
 type Patient = { id: number; first_name: string; last_name: string; email: string; phone: string };
@@ -88,6 +88,13 @@ export function AppointmentsAdmin() {
   const [dateFilter, setDateFilter] = useState('');
 
   const [editing, setEditing] = useState<FormData | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => setNow(Date.now()), 60_000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -168,6 +175,14 @@ export function AppointmentsAdmin() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAtender = async (id: number) => {
+    await apiFetch(`/api/appointments/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'CONFIRMED' }),
+    });
+    await load();
   };
 
   const handleDelete = async (id: number) => {
@@ -277,6 +292,20 @@ export function AppointmentsAdmin() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
+                          {(() => {
+                            const startsMs = new Date(a.starts_at).getTime();
+                            const canAtender = now >= startsMs - 15 * 60 * 1000
+                              && ['SCHEDULED', 'CONFIRMED'].includes(a.status);
+                            return canAtender ? (
+                              <button
+                                onClick={() => handleAtender(a.id)}
+                                className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                title="Atender cita"
+                              >
+                                <Stethoscope className="w-4 h-4" />
+                              </button>
+                            ) : null;
+                          })()}
                           <button
                             onClick={() => openEdit(a)}
                             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
