@@ -14,9 +14,9 @@ import {
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false },
   { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },
+  { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false }, 
   { to: '/admin/settings', icon: Settings, label: 'Configuración', end: false },
 ];
 
