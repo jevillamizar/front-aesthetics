@@ -9,7 +9,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminLayout } from './layouts/AdminLayout';
 import { DashboardHome } from './pages/admin/DashboardHome';
 import { AppointmentsAdmin } from './pages/admin/AppointmentsAdmin';
-import { PlaceholderPage } from './pages/admin/PlaceholderPage';
+import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
+import { PatientsAdmin } from './pages/admin/PatientsAdmin';
 import { TreatmentsAdmin } from './pages/admin/TreatmentsAdmin';
 import { Settings } from './pages/admin/Settings';
 
@@ -36,7 +37,8 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<DashboardHome />} />
             <Route path="treatments" element={<TreatmentsAdmin />} />
             <Route path="appointments" element={<AppointmentsAdmin />} />
-            <Route path="patients" element={<PlaceholderPage title="Pacientes" description="Gestiona la información de tus pacientes." />} />
+            <Route path="doctors" element={<DoctorsAdmin />} />
+            <Route path="patients" element={<PatientsAdmin />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 
