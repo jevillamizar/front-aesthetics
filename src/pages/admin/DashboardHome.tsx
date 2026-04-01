@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
+import { AtenderModal } from '../../components/AtenderModal';
 import { CalendarDays, Users, Scissors, TrendingUp, Loader2, Clock, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react';
 
 type Stats = {
@@ -186,6 +187,7 @@ export function DashboardHome() {
   const [allAppts, setAllAppts] = useState<Appt[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('day');
+  const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -217,15 +219,15 @@ export function DashboardHome() {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
-  const handleAtender = useCallback(async (id: number) => {
-    await apiFetch(`/api/appointments/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify({ status: 'CONFIRMED' }),
-    });
+  const reloadDashboard = useCallback(async () => {
     const r = await apiFetch('/api/dashboard/');
     const data = await r.json();
     setStats(data.stats);
     setAllAppts(data.upcoming_appointments ?? []);
+  }, []);
+
+  const handleAtender = useCallback((id: number) => {
+    setAtenderApptId(id);
   }, []);
 
   const weekAppts = allAppts.filter((a) => {
@@ -317,6 +319,12 @@ export function DashboardHome() {
           />
         )}
       </div>
+
+      <AtenderModal
+        appointmentId={atenderApptId}
+        onClose={() => setAtenderApptId(null)}
+        onDone={reloadDashboard}
+      />
     </div>
   );
 }

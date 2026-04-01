@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { AtenderModal } from '../../components/AtenderModal';
 import {
-  CalendarDays, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, X,
+  CalendarDays, ChevronDown, ChevronUp, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, X,
 } from 'lucide-react';
 
 type Patient = { id: number; first_name: string; last_name: string; email: string; phone: string };
@@ -89,6 +90,10 @@ export function AppointmentsAdmin() {
   const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
   const [editing, setEditing] = useState<FormData | null>(null);
+  const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
+  const [historial, setHistorial] = useState<Appointment[]>([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
+  const [historialExpanded, setHistorialExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -123,8 +128,19 @@ export function AppointmentsAdmin() {
     setTreatments(tJson.treatments || []);
   };
 
+  const loadHistorial = useCallback(async () => {
+    setHistorialLoading(true);
+    try {
+      const res = await apiFetch('/api/appointments/?past=1');
+      const json = await res.json();
+      setHistorial(json.appointments || []);
+    } finally {
+      setHistorialLoading(false);
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadMeta(); }, []);
+  useEffect(() => { loadMeta(); loadHistorial(); }, [loadHistorial]);
 
   const openNew = () => setEditing({ ...empty });
 
@@ -179,12 +195,8 @@ export function AppointmentsAdmin() {
     }
   };
 
-  const handleAtender = async (id: number) => {
-    await apiFetch(`/api/appointments/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify({ status: 'CONFIRMED' }),
-    });
-    await load();
+  const handleAtender = (id: number) => {
+    setAtenderApptId(id);
   };
 
   const handleDelete = async (id: number) => {
@@ -345,6 +357,79 @@ export function AppointmentsAdmin() {
         )}
       </div>
 
+      {/* Historial */}
+      <div className="mt-8">
+        <button
+          onClick={() => setHistorialExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-gray-200 hover:bg-gray-50/50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-gray-400" />
+            <span className="text-sm font-medium text-gray-700">Historial de Citas</span>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{historial.length}</span>
+          </div>
+          {historialExpanded
+            ? <ChevronUp className="w-4 h-4 text-gray-400" />
+            : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
+
+        {historialExpanded && (
+          <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 overflow-hidden">
+            {historialLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+              </div>
+            ) : historial.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-gray-400 text-sm">Sin registros en el historial</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Fecha</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Hora</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Paciente</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Tratamiento</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500">Notas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {historial.map((a) => {
+                      const { date, time } = toLocal(a.starts_at);
+                      const st = statusInfo(a.status);
+                      return (
+                        <tr key={a.id} className="hover:bg-gray-50/40 transition-colors">
+                          <td className="px-4 py-3 text-gray-700">{date}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 text-gray-500">
+                              <Clock className="w-3.5 h-3.5" />{time}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{a.patient_name}</p>
+                            <p className="text-xs text-gray-400">{a.patient_email}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{a.treatment_name ?? '—'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>
+                              {st.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">{a.notes || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -479,6 +564,12 @@ export function AppointmentsAdmin() {
           </div>
         </div>
       )}
+
+      <AtenderModal
+        appointmentId={atenderApptId}
+        onClose={() => setAtenderApptId(null)}
+        onDone={() => { load(); loadHistorial(); }}
+      />
     </div>
   );
 }
