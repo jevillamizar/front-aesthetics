@@ -176,14 +176,6 @@ export function AppointmentsAdmin() {
     await load();
   };
 
-  const handleStatusChange = async (id: number, status: string) => {
-    await apiFetch(`/api/appointments/${id}/`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    });
-    await load();
-  };
-
   const onTreatmentChange = (tid: number | '') => {
     const t = treatments.find((t) => t.id === Number(tid));
     setEditing((prev) => prev ? {
@@ -279,15 +271,9 @@ export function AppointmentsAdmin() {
                       </td>
                       <td className="px-4 py-3 text-gray-600">{a.treatment_name ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <select
-                          value={a.status}
-                          onChange={(e) => handleStatusChange(a.id, e.target.value)}
-                          className={`text-xs font-medium px-2.5 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-900 ${st.color}`}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s.value} value={s.value}>{s.label}</option>
-                          ))}
-                        </select>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>
+                          {st.label}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1">
