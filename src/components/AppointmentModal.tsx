@@ -24,6 +24,7 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [treatments, setTreatments] = useState<TreatmentOption[]>([]);
   const [treatmentsLoading, setTreatmentsLoading] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState(60);
 
   const apiBase =
     (import.meta.env.VITE_API_BASE ?? '').trim() ||
@@ -70,6 +71,7 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
       setError(null);
       setTreatments([]);
       setTreatmentsLoading(false);
+      setSelectedDuration(60);
     };
   }, [open, onClose, treatmentsEndpoint]);
 
@@ -138,7 +140,7 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                       const treatmentSlug = String(formData.get('treatment_slug') ?? '').trim();
                       const date = String(formData.get('date') ?? '').trim();
                       const time = String(formData.get('time') ?? '').trim();
-                      const durationMinutes = Number(formData.get('duration_minutes') ?? 60);
+                      const durationMinutes = selectedDuration;
                       const notes = String(formData.get('notes') ?? '').trim();
 
                       if (!firstName || !lastName || !email) {
@@ -266,9 +268,13 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-[#6B6B6B]">Servicio</label>
+                        <label className="text-xs font-medium text-[#6B6B6B]">Tratamiento</label>
                         <select
                           name="treatment_slug"
+                          onChange={(e) => {
+                            const selected = treatments.find(t => t.slug === e.target.value);
+                            setSelectedDuration(selected?.duration_minutes ?? 60);
+                          }}
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white">
                           <option value="">{treatmentsLoading ? 'Cargando...' : 'Seleccionar'}</option>
                           {treatments
@@ -300,6 +306,15 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                           type="time"
                           required
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B] bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-[#6B6B6B]">Duración</label>
+                        <input
+                          type="text"
+                          value={`${selectedDuration} minutos`}
+                          disabled
+                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm bg-gray-50 text-gray-600"
                         />
                       </div>
                     </div>
