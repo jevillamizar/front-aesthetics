@@ -243,17 +243,6 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
                           className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
                           placeholder="(###) ###-####" />
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-[#6B6B6B]">Duración (min)</label>
-                        <input
-                          name="duration_minutes"
-                          type="number"
-                          min={15}
-                          step={15}
-                          defaultValue={60}
-                          className="h-11 rounded-xl border border-[#EAEAEA] px-4 text-sm outline-none focus:ring-2 focus:ring-[#8B9E8B]"
-                        />
-                      </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
