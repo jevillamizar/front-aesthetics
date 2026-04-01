@@ -318,13 +318,15 @@ export function AppointmentsAdmin() {
                               </button>
                             ) : null;
                           })()}
-                          <button
-                            onClick={() => openEdit(a)}
-                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Editar"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          {a.status !== 'CONFIRMED' && (
+                            <button
+                              onClick={() => openEdit(a)}
+                              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(a.id)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
