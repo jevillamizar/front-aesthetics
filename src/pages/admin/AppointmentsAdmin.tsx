@@ -330,7 +330,7 @@ export function AppointmentsAdmin() {
                               </button>
                             ) : null;
                           })()}
-                          {a.status !== 'CONFIRMED' && (
+                          {!['CONFIRMED', 'COMPLETED'].includes(a.status) && (
                             <button
                               onClick={() => openEdit(a)}
                               className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
