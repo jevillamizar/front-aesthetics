@@ -23,6 +23,11 @@ type MedicalRecord = {
   patient_name: string;
   doctor_id: number;
   doctor_name: string;
+  doctor_profession: string;
+  doctor_specialty: string;
+  doctor_rethus_number: string;
+  doctor_rethus_status: string;
+  doctor_professional_seal: string;
   appointment_id: number | null;
   chief_complaint: string;
   current_illness: string;
@@ -355,6 +360,25 @@ export function MedicalRecordsAdmin() {
                             </span>
                           </div>
                         )}
+                        {/* Médico responsable */}
+                        <div className="sm:col-span-2 bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
+                          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Médico responsable</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div><p className="text-xs text-gray-400">Nombre</p><p className="text-sm font-medium text-gray-800">{r.doctor_name || '—'}</p></div>
+                            {r.doctor_profession && <div><p className="text-xs text-gray-400">Profesión</p><p className="text-sm text-gray-800">{r.doctor_profession}{r.doctor_specialty ? ` · ${r.doctor_specialty}` : ''}</p></div>}
+                            {r.doctor_rethus_number && (
+                              <div>
+                                <p className="text-xs text-gray-400">ReTHUS</p>
+                                <p className="text-sm text-gray-800">{r.doctor_rethus_number}
+                                  <span className={`ml-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                                    r.doctor_rethus_status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                                  }`}>{r.doctor_rethus_status === 'ACTIVE' ? 'Activo' : 'Suspendido'}</span>
+                                </p>
+                              </div>
+                            )}
+                            {r.doctor_professional_seal && <div className="sm:col-span-2"><p className="text-xs text-gray-400">Sello profesional</p><p className="text-sm font-medium text-gray-800">{r.doctor_professional_seal}</p></div>}
+                          </div>
+                        </div>
                       </div>
                       {r.treatment_items.length > 0 && (
                         <div>

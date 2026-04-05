@@ -11,6 +11,7 @@ import { DashboardHome } from './pages/admin/DashboardHome';
 import { AppointmentsAdmin } from './pages/admin/AppointmentsAdmin';
 import { CalendarAdmin } from './pages/admin/CalendarAdmin';
 import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
+import { DoctorProfile } from './pages/admin/DoctorProfile';
 import { MedicalRecordsAdmin } from './pages/admin/MedicalRecordsAdmin';
 import { PatientsAdmin } from './pages/admin/PatientsAdmin';
 import { PatientProfile } from './pages/admin/PatientProfile';
@@ -44,6 +45,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="calendar" element={<CalendarAdmin />} />
             <Route path="revenue" element={<RevenueAdmin />} />
             <Route path="doctors" element={<DoctorsAdmin />} />
+            <Route path="doctors/:id" element={<DoctorProfile />} />
             <Route path="patients" element={<PatientsAdmin />} />
             <Route path="patients/:id" element={<PatientProfile />} />
             <Route path="medical-records" element={<MedicalRecordsAdmin />} />
