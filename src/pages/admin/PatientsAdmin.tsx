@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { Eye, Loader2, Pencil, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
+import { Loader2, Pencil, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
 
 type Patient = {
   id: number;
@@ -233,7 +233,7 @@ export function PatientsAdmin() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {patients.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50/40 transition-colors">
+                  <tr key={p.id} onClick={() => navigate(`/admin/patients/${p.id}`)} className="hover:bg-gray-50/60 transition-colors cursor-pointer">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{p.last_name}, {p.first_name}</p>
                       {p.email && <p className="text-xs text-gray-400 mt-0.5">{p.email}</p>}
@@ -245,12 +245,8 @@ export function PatientsAdmin() {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{p.phone || '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDob(p.date_of_birth)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex gap-1">
-                        <button onClick={() => navigate(`/admin/patients/${p.id}`)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver perfil">
-                          <Eye className="w-4 h-4" />
-                        </button>
                         <button onClick={() => openEdit(p)}
                           className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
