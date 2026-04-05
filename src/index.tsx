@@ -12,6 +12,7 @@ import { AppointmentsAdmin } from './pages/admin/AppointmentsAdmin';
 import { CalendarAdmin } from './pages/admin/CalendarAdmin';
 import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
 import { DoctorProfile } from './pages/admin/DoctorProfile';
+import { ConsentsAdmin } from './pages/admin/ConsentsAdmin';
 import { MedicalRecordsAdmin } from './pages/admin/MedicalRecordsAdmin';
 import { PatientsAdmin } from './pages/admin/PatientsAdmin';
 import { PatientProfile } from './pages/admin/PatientProfile';
@@ -49,6 +50,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="patients" element={<PatientsAdmin />} />
             <Route path="patients/:id" element={<PatientProfile />} />
             <Route path="medical-records" element={<MedicalRecordsAdmin />} />
+            <Route path="consents" element={<ConsentsAdmin />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 

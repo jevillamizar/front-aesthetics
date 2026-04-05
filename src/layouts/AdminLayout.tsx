@@ -14,6 +14,7 @@ import {
   CalendarRange,
   TrendingUp,
   ClipboardList,
+  FileSignature,
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },
   { to: '/admin/medical-records', icon: ClipboardList, label: 'Historial Clínico', end: false },
+  { to: '/admin/consents', icon: FileSignature, label: 'Consentimientos', end: false },
   { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configuración', end: false },
 ];
