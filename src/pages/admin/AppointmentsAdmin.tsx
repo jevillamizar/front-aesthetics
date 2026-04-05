@@ -2,10 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
 import { AtenderModal } from '../../components/AtenderModal';
 import {
-  CalendarDays, ChevronDown, ChevronUp, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, X,
+  CalendarDays, ChevronDown, ChevronUp, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, UserPlus, X,
 } from 'lucide-react';
 
 type Patient = { id: number; first_name: string; last_name: string; email: string; phone: string };
+
+const DOC_TYPES = [
+  { value: 'CC',  label: 'CC — Cédula de Ciudadanía' },
+  { value: 'CE',  label: 'CE — Cédula de Extranjería' },
+  { value: 'TI',  label: 'TI — Tarjeta de Identidad' },
+  { value: 'PP',  label: 'PP — Pasaporte' },
+  { value: 'RC',  label: 'RC — Registro Civil' },
+  { value: 'NIT', label: 'NIT' },
+];
+
+const EMPTY_NEW_PATIENT = { document_type: '', document_number: '', first_name: '', last_name: '', phone: '', email: '' };
 type Treatment = { id: number; name: string; duration_minutes: number };
 
 type Appointment = {
@@ -90,6 +101,10 @@ export function AppointmentsAdmin() {
   const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
   const [editing, setEditing] = useState<FormData | null>(null);
+  const [showNewPatient, setShowNewPatient] = useState(false);
+  const [newPatient, setNewPatient] = useState({ ...EMPTY_NEW_PATIENT });
+  const [creatingPatient, setCreatingPatient] = useState(false);
+  const [newPatientError, setNewPatientError] = useState('');
   const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
   const [historial, setHistorial] = useState<Appointment[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
@@ -142,9 +157,17 @@ export function AppointmentsAdmin() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadMeta(); loadHistorial(); }, [loadHistorial]);
 
-  const openNew = () => setEditing({ ...empty });
+  const openNew = () => {
+    setEditing({ ...empty });
+    setShowNewPatient(false);
+    setNewPatient({ ...EMPTY_NEW_PATIENT });
+    setNewPatientError('');
+  };
 
   const openEdit = (a: Appointment) => {
+    setShowNewPatient(false);
+    setNewPatient({ ...EMPTY_NEW_PATIENT });
+    setNewPatientError('');
     const durMs = new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime();
     setEditing({
       id: a.id,
@@ -203,6 +226,32 @@ export function AppointmentsAdmin() {
     if (!confirm('¿Eliminar esta cita?')) return;
     await apiFetch(`/api/appointments/${id}/`, { method: 'DELETE' });
     await load();
+  };
+
+  const handleCreatePatient = async () => {
+    if (!newPatient.first_name.trim() || !newPatient.last_name.trim()) {
+      setNewPatientError('Nombres y apellidos son obligatorios.');
+      return;
+    }
+    setCreatingPatient(true);
+    setNewPatientError('');
+    try {
+      const res = await apiFetch('/api/patients/', {
+        method: 'POST',
+        body: JSON.stringify(newPatient),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.detail || 'Error al crear paciente');
+      const created: Patient = d.patient;
+      setPatients((prev) => [...prev, created]);
+      setEditing((prev) => prev ? { ...prev, patient_id: created.id } : prev);
+      setShowNewPatient(false);
+      setNewPatient({ ...EMPTY_NEW_PATIENT });
+    } catch (e: unknown) {
+      setNewPatientError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setCreatingPatient(false);
+    }
   };
 
   const onTreatmentChange = (tid: number | '') => {
@@ -455,16 +504,105 @@ export function AppointmentsAdmin() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Paciente <span className="text-red-500">*</span></label>
                 <select
                   value={editing.patient_id}
-                  onChange={(e) => setEditing({ ...editing, patient_id: Number(e.target.value) || '' })}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') {
+                      setShowNewPatient(true);
+                      setEditing({ ...editing, patient_id: '' });
+                    } else {
+                      setShowNewPatient(false);
+                      setEditing({ ...editing, patient_id: Number(e.target.value) || '' });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
                 >
                   <option value="">Selecciona un paciente</option>
+                  <option value="__new__">✚ Nuevo paciente…</option>
                   {patients.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.last_name}, {p.first_name} {p.email ? `— ${p.email}` : ''}
                     </option>
                   ))}
                 </select>
+
+                {/* Inline new-patient mini-form */}
+                {showNewPatient && (
+                  <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                        <UserPlus className="w-3.5 h-3.5" /> Nuevo paciente
+                      </span>
+                      <button type="button" onClick={() => { setShowNewPatient(false); setNewPatientError(''); }}
+                        className="text-gray-400 hover:text-gray-600 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {newPatientError && (
+                      <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{newPatientError}</p>
+                    )}
+
+                    <div className="grid grid-cols-[1fr_1.4fr] gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Tipo doc.</label>
+                        <select value={newPatient.document_type}
+                          onChange={(e) => setNewPatient({ ...newPatient, document_type: e.target.value })}
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                          <option value="">—</option>
+                          {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Número</label>
+                        <input type="text" value={newPatient.document_number}
+                          onChange={(e) => setNewPatient({ ...newPatient, document_number: e.target.value })}
+                          placeholder="12345678"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Nombres <span className="text-red-500">*</span></label>
+                        <input type="text" value={newPatient.first_name}
+                          onChange={(e) => setNewPatient({ ...newPatient, first_name: e.target.value })}
+                          placeholder="Nombres"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Apellidos <span className="text-red-500">*</span></label>
+                        <input type="text" value={newPatient.last_name}
+                          onChange={(e) => setNewPatient({ ...newPatient, last_name: e.target.value })}
+                          placeholder="Apellidos"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                        <input type="tel" value={newPatient.phone}
+                          onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
+                          placeholder="300 000 0000"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Correo</label>
+                        <input type="email" value={newPatient.email}
+                          onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
+                          placeholder="correo@email.com"
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={handleCreatePatient} disabled={creatingPatient}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                      {creatingPatient
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <UserPlus className="w-3.5 h-3.5" />}
+                      Crear y seleccionar
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Treatment */}

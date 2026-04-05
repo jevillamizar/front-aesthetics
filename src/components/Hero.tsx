@@ -98,12 +98,20 @@ export function Hero({ onBook, headline, description, heroImageUrl, trustIndicat
             variants={itemVariants}
             className="text-5xl md:text-7xl font-light tracking-tight text-[#2D2D2D] mb-6 leading-[1.1]">
 
-            {headline ? (
-              headline
-            ) : (
+            {headline ? (() => {
+              const words = headline.trim().split(/\s+/);
+              const main = words.slice(0, -2).join(' ');
+              const styled = words.slice(-2).join(' ');
+              return (
+                <>
+                  {main}{main ? ' ' : ''} <br />
+                  <span className="italic text-[var(--primary)]">{styled}</span>
+                </>
+              );
+            })() : (
               <>
                 Revela tu <br />
-                <span className="font-serif italic text-[var(--primary)]">Resplandor natural</span>
+                <span className="italic text-[var(--primary)]">Resplandor natural</span>
               </>
             )}
           </motion.h1>

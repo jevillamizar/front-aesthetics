@@ -133,9 +133,8 @@ export function App() {
                 <span className="text-base md:text-lg font-medium hidden sm:inline" style={{ color: 'var(--text)' }}>{brandName}</span>
               </>
             ) : (
-              <span className="text-2xl font-serif italic" style={{ color: 'var(--text)' }}>
-                {brandName.split(' ')[0] ?? brandName}{' '}
-                <span className="text-[var(--primary)]">{brandName.split(' ').slice(1).join(' ') || 'Aesthetics'}</span>
+              <span className="text-2xl italic" style={{ color: 'var(--text)', fontFamily: "var(--font-heading, 'Playfair Display', serif)" }}>
+                {brandName}
               </span>
             )}
           </a>
