@@ -82,6 +82,7 @@ export function AtenderModal({ appointmentId, onClose, onDone }: Props) {
   };
 
   const st = appt ? (STATUS_LABELS[appt.status] ?? { label: appt.status, color: 'bg-gray-100 text-gray-600' }) : null;
+  const isReadOnly = appt ? ['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(appt.status) : false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -157,12 +158,21 @@ export function AtenderModal({ appointmentId, onClose, onDone }: Props) {
               </label>
               <textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => !isReadOnly && setNotes(e.target.value)}
+                readOnly={isReadOnly}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none resize-none
+                  ${isReadOnly ? 'bg-gray-50 text-gray-500 cursor-default' : 'focus:ring-2 focus:ring-gray-900'}`}
                 placeholder="Observaciones del médico, procedimientos realizados…"
               />
             </div>
+
+            {isReadOnly && (
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st?.color ?? ''}`}>{st?.label}</span>
+                <span className="text-sm text-gray-500">Esta cita ya no se puede modificar.</span>
+              </div>
+            )}
 
             {error && (
               <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
@@ -181,22 +191,26 @@ export function AtenderModal({ appointmentId, onClose, onDone }: Props) {
             >
               Cerrar
             </button>
-            <button
-              onClick={() => handleAction('NO_SHOW')}
-              disabled={!!saving}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
-            >
-              {saving === 'NO_SHOW' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-              No asistió
-            </button>
-            <button
-              onClick={() => handleAction('COMPLETED')}
-              disabled={!!saving}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-            >
-              {saving === 'COMPLETED' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              Completar cita
-            </button>
+            {!isReadOnly && (
+              <>
+                <button
+                  onClick={() => handleAction('NO_SHOW')}
+                  disabled={!!saving}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-sm font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                >
+                  {saving === 'NO_SHOW' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  No asistió
+                </button>
+                <button
+                  onClick={() => handleAction('COMPLETED')}
+                  disabled={!!saving}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving === 'COMPLETED' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Completar cita
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
