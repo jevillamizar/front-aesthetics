@@ -17,8 +17,14 @@ type Patient = {
   phone: string;
   email: string;
   address: string;
+  eps: string;
+  legal_guardian: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relation: string;
   photo: string | null;
   notes: string;
+  created_at: string | null;
 };
 
 type EditForm = {
@@ -31,6 +37,11 @@ type EditForm = {
   phone: string;
   email: string;
   address: string;
+  eps: string;
+  legal_guardian: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relation: string;
   notes: string;
   photoFile: File | null;
   clearPhoto: boolean;
@@ -63,7 +74,18 @@ type MedicalRecord = {
   doctor_name: string;
   appointment_id: number | null;
   chief_complaint: string;
+  current_illness: string;
+  personal_history: string;
+  surgical_history: string;
+  allergic_history: string;
+  pharmacological_history: string;
+  family_history: string;
+  physical_exam: string;
   diagnosis: string;
+  treatment_plan: string;
+  evolution: string;
+  informed_consent: string;
+  consent_signed: boolean;
   notes: string;
   created_at: string;
   treatment_items: TreatmentItem[];
@@ -172,6 +194,11 @@ export function PatientProfile() {
       phone: patient.phone,
       email: patient.email,
       address: patient.address,
+      eps: patient.eps,
+      legal_guardian: patient.legal_guardian,
+      emergency_contact_name: patient.emergency_contact_name,
+      emergency_contact_phone: patient.emergency_contact_phone,
+      emergency_contact_relation: patient.emergency_contact_relation,
       notes: patient.notes,
       photoFile: null,
       clearPhoto: false,
@@ -214,6 +241,11 @@ export function PatientProfile() {
           phone: editing.phone,
           email: editing.email,
           address: editing.address,
+          eps: editing.eps,
+          legal_guardian: editing.legal_guardian,
+          emergency_contact_name: editing.emergency_contact_name,
+          emergency_contact_phone: editing.emergency_contact_phone,
+          emergency_contact_relation: editing.emergency_contact_relation,
           notes: editing.notes,
           photo: editing.clearPhoto ? '' : undefined,
         });
@@ -401,18 +433,31 @@ export function PatientProfile() {
       </div>
 
       {/* Full data grid */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">Información completa</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <InfoRow label="Tipo documento" value={patient.document_type} />
-          <InfoRow label="Número documento" value={patient.document_number} />
-          <InfoRow label="Nombres" value={patient.first_name} />
-          <InfoRow label="Apellidos" value={patient.last_name} />
-          <InfoRow label="Fecha nacimiento" value={formatDob(patient.date_of_birth)} />
-          <InfoRow label="Sexo" value={patient.sex ? SEX_LABEL[patient.sex] : ''} />
-          <InfoRow label="Teléfono" value={patient.phone} />
-          <InfoRow label="Correo electrónico" value={patient.email} />
-          <InfoRow label="Dirección" value={patient.address} />
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 space-y-6">
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Identificación</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <InfoRow label="Tipo documento" value={patient.document_type} />
+            <InfoRow label="Número documento" value={patient.document_number} />
+            <InfoRow label="Nombres" value={patient.first_name} />
+            <InfoRow label="Apellidos" value={patient.last_name} />
+            <InfoRow label="Fecha nacimiento" value={formatDob(patient.date_of_birth)} />
+            <InfoRow label="Sexo" value={patient.sex ? SEX_LABEL[patient.sex] : ''} />
+            <InfoRow label="Teléfono" value={patient.phone} />
+            <InfoRow label="Correo electrónico" value={patient.email} />
+            <InfoRow label="Dirección" value={patient.address} />
+            {patient.created_at && <InfoRow label="Fecha de registro" value={formatDate(patient.created_at)} />}
+          </div>
+        </div>
+        <div className="border-t border-gray-50 pt-5">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos administrativos</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <InfoRow label="EPS" value={patient.eps} />
+            <InfoRow label="Responsable" value={patient.legal_guardian} />
+            <InfoRow label="Contacto emergencia" value={patient.emergency_contact_name} />
+            <InfoRow label="Parentesco" value={patient.emergency_contact_relation} />
+            <InfoRow label="Tel. emergencia" value={patient.emergency_contact_phone} />
+          </div>
         </div>
       </div>
 
@@ -519,6 +564,40 @@ export function PatientProfile() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
               </div>
 
+              {/* Administrative data */}
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos administrativos</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">EPS</label>
+                    <input type="text" value={editing.eps} onChange={(e) => setEditing({ ...editing, eps: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre de la EPS" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Responsable (si es menor)</label>
+                    <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre del responsable" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contacto de emergencia</label>
+                      <input type="text" value={editing.emergency_contact_name} onChange={(e) => setEditing({ ...editing, emergency_contact_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
+                      <input type="text" value={editing.emergency_contact_relation} onChange={(e) => setEditing({ ...editing, emergency_contact_relation: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: Madre, Esposo…" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono de emergencia</label>
+                    <input type="tel" value={editing.emergency_contact_phone} onChange={(e) => setEditing({ ...editing, emergency_contact_phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="+57 300 000 0000" />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
                 <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
@@ -583,11 +662,56 @@ export function PatientProfile() {
                       <div className="px-5 pb-5 bg-gray-50/30 border-t border-gray-50 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                           {r.chief_complaint && <InfoRow label="Motivo de consulta" value={r.chief_complaint} />}
-                          {r.diagnosis      && <InfoRow label="Diagnóstico" value={r.diagnosis} />}
-                          {r.notes          && (
+                          {r.current_illness && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Enfermedad actual</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-line">{r.current_illness}</p>
+                            </div>
+                          )}
+                          {(r.personal_history||r.surgical_history||r.allergic_history||r.pharmacological_history||r.family_history) && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Antecedentes</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {r.personal_history        && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Personales</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.personal_history}</p></div>}
+                                {r.surgical_history        && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Quirúrgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.surgical_history}</p></div>}
+                                {r.allergic_history        && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Alérgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.allergic_history}</p></div>}
+                                {r.pharmacological_history && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Farmacológicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.pharmacological_history}</p></div>}
+                                {r.family_history          && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Familiares</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.family_history}</p></div>}
+                              </div>
+                            </div>
+                          )}
+                          {r.physical_exam   && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Examen físico</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-line">{r.physical_exam}</p>
+                            </div>
+                          )}
+                          {r.diagnosis       && <InfoRow label="Diagnóstico" value={r.diagnosis} />}
+                          {r.treatment_plan  && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Plan de tratamiento</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-line">{r.treatment_plan}</p>
+                            </div>
+                          )}
+                          {r.evolution       && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Evolución</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-line">{r.evolution}</p>
+                            </div>
+                          )}
+                          {r.notes           && (
                             <div className="sm:col-span-2">
                               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Notas</p>
                               <p className="text-sm text-gray-800 whitespace-pre-line">{r.notes}</p>
+                            </div>
+                          )}
+                          {(r.informed_consent || r.consent_signed) && (
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Consentimiento informado</p>
+                              {r.informed_consent && <p className="text-sm text-gray-800 whitespace-pre-line mb-1">{r.informed_consent}</p>}
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.consent_signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                                {r.consent_signed ? '✓ Firmado' : 'Pendiente de firma'}
+                              </span>
                             </div>
                           )}
                         </div>

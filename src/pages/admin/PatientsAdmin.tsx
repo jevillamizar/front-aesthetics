@@ -14,6 +14,11 @@ type Patient = {
   phone: string;
   email: string;
   address: string;
+  eps: string;
+  legal_guardian: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relation: string;
   notes: string;
 };
 
@@ -28,6 +33,11 @@ type FormData = {
   phone: string;
   email: string;
   address: string;
+  eps: string;
+  legal_guardian: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relation: string;
   notes: string;
 };
 
@@ -56,6 +66,11 @@ const emptyForm: FormData = {
   phone: '',
   email: '',
   address: '',
+  eps: '',
+  legal_guardian: '',
+  emergency_contact_name: '',
+  emergency_contact_phone: '',
+  emergency_contact_relation: '',
   notes: '',
 };
 
@@ -102,6 +117,11 @@ export function PatientsAdmin() {
       phone: p.phone,
       email: p.email,
       address: p.address,
+      eps: p.eps,
+      legal_guardian: p.legal_guardian,
+      emergency_contact_name: p.emergency_contact_name,
+      emergency_contact_phone: p.emergency_contact_phone,
+      emergency_contact_relation: p.emergency_contact_relation,
       notes: p.notes,
     });
   };
@@ -125,6 +145,11 @@ export function PatientsAdmin() {
         phone: editing.phone.trim(),
         email: editing.email.trim(),
         address: editing.address.trim(),
+        eps: editing.eps.trim(),
+        legal_guardian: editing.legal_guardian.trim(),
+        emergency_contact_name: editing.emergency_contact_name.trim(),
+        emergency_contact_phone: editing.emergency_contact_phone.trim(),
+        emergency_contact_relation: editing.emergency_contact_relation.trim(),
         notes: editing.notes.trim(),
       };
       const isNew = !editing.id;
@@ -323,12 +348,46 @@ export function PatientsAdmin() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Calle, número, barrio, ciudad" />
               </div>
 
+              {/* Datos administrativos */}
+              <div className="pt-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos administrativos</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">EPS</label>
+                    <input type="text" value={editing.eps} onChange={(e) => setEditing({ ...editing, eps: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre de la EPS" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Responsable (si es menor de edad)</label>
+                    <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre completo del responsable" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contacto de emergencia</label>
+                      <input type="text" value={editing.emergency_contact_name} onChange={(e) => setEditing({ ...editing, emergency_contact_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
+                      <input type="text" value={editing.emergency_contact_relation} onChange={(e) => setEditing({ ...editing, emergency_contact_relation: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: Madre, Esposo…" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono de emergencia</label>
+                    <input type="tel" value={editing.emergency_contact_phone} onChange={(e) => setEditing({ ...editing, emergency_contact_phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="+57 300 000 0000" />
+                  </div>
+                </div>
+              </div>
+
               {/* Notas */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
                 <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
                   rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                  placeholder="Alergias, condiciones médicas, observaciones…" />
+                  placeholder="Observaciones generales…" />
               </div>
             </div>
 

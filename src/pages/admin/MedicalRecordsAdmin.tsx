@@ -25,7 +25,18 @@ type MedicalRecord = {
   doctor_name: string;
   appointment_id: number | null;
   chief_complaint: string;
+  current_illness: string;
+  personal_history: string;
+  surgical_history: string;
+  allergic_history: string;
+  pharmacological_history: string;
+  family_history: string;
+  physical_exam: string;
   diagnosis: string;
+  treatment_plan: string;
+  evolution: string;
+  informed_consent: string;
+  consent_signed: boolean;
   notes: string;
   created_at: string;
   treatment_items: TreatmentItem[];
@@ -37,7 +48,18 @@ type FormData = {
   doctor_id: number | '';
   appointment_id: number | '';
   chief_complaint: string;
+  current_illness: string;
+  personal_history: string;
+  surgical_history: string;
+  allergic_history: string;
+  pharmacological_history: string;
+  family_history: string;
+  physical_exam: string;
   diagnosis: string;
+  treatment_plan: string;
+  evolution: string;
+  informed_consent: string;
+  consent_signed: boolean;
   notes: string;
   treatment_items: TreatmentItem[];
 };
@@ -47,7 +69,18 @@ const emptyForm: FormData = {
   doctor_id: '',
   appointment_id: '',
   chief_complaint: '',
+  current_illness: '',
+  personal_history: '',
+  surgical_history: '',
+  allergic_history: '',
+  pharmacological_history: '',
+  family_history: '',
+  physical_exam: '',
   diagnosis: '',
+  treatment_plan: '',
+  evolution: '',
+  informed_consent: '',
+  consent_signed: false,
   notes: '',
   treatment_items: [],
 };
@@ -111,7 +144,18 @@ export function MedicalRecordsAdmin() {
       doctor_id: r.doctor_id,
       appointment_id: r.appointment_id ?? '',
       chief_complaint: r.chief_complaint,
+      current_illness: r.current_illness,
+      personal_history: r.personal_history,
+      surgical_history: r.surgical_history,
+      allergic_history: r.allergic_history,
+      pharmacological_history: r.pharmacological_history,
+      family_history: r.family_history,
+      physical_exam: r.physical_exam,
       diagnosis: r.diagnosis,
+      treatment_plan: r.treatment_plan,
+      evolution: r.evolution,
+      informed_consent: r.informed_consent,
+      consent_signed: r.consent_signed,
       notes: r.notes,
       treatment_items: r.treatment_items.map((it) => ({ ...it })),
     });
@@ -130,7 +174,18 @@ export function MedicalRecordsAdmin() {
         doctor_id: editing.doctor_id,
         appointment_id: editing.appointment_id || null,
         chief_complaint: editing.chief_complaint.trim(),
+        current_illness: editing.current_illness.trim(),
+        personal_history: editing.personal_history.trim(),
+        surgical_history: editing.surgical_history.trim(),
+        allergic_history: editing.allergic_history.trim(),
+        pharmacological_history: editing.pharmacological_history.trim(),
+        family_history: editing.family_history.trim(),
+        physical_exam: editing.physical_exam.trim(),
         diagnosis: editing.diagnosis.trim(),
+        treatment_plan: editing.treatment_plan.trim(),
+        evolution: editing.evolution.trim(),
+        informed_consent: editing.informed_consent.trim(),
+        consent_signed: editing.consent_signed,
         notes: editing.notes.trim(),
         treatment_items: editing.treatment_items.map((it) => ({
           treatment_id: it.treatment_id,
@@ -273,8 +328,33 @@ export function MedicalRecordsAdmin() {
                     <div className="px-5 pb-5 bg-gray-50/40 border-t border-gray-50">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mb-4">
                         {r.chief_complaint && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Motivo de consulta</p><p className="text-sm text-gray-800">{r.chief_complaint}</p></div>}
+                        {r.current_illness && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Enfermedad actual</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.current_illness}</p></div>}
+                        {(r.personal_history||r.surgical_history||r.allergic_history||r.pharmacological_history||r.family_history) && (
+                          <div className="sm:col-span-2">
+                            <p className="text-xs font-medium text-gray-500 uppercase mb-2">Antecedentes</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {r.personal_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Personales</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.personal_history}</p></div>}
+                              {r.surgical_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Quirúrgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.surgical_history}</p></div>}
+                              {r.allergic_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Alérgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.allergic_history}</p></div>}
+                              {r.pharmacological_history && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Farmacológicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.pharmacological_history}</p></div>}
+                              {r.family_history         && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Familiares</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.family_history}</p></div>}
+                            </div>
+                          </div>
+                        )}
+                        {r.physical_exam  && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Examen físico</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.physical_exam}</p></div>}
                         {r.diagnosis      && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Diagnóstico</p><p className="text-sm text-gray-800">{r.diagnosis}</p></div>}
+                        {r.treatment_plan && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Plan de tratamiento</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.treatment_plan}</p></div>}
+                        {r.evolution      && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Evolución</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.evolution}</p></div>}
                         {r.notes          && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Notas</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.notes}</p></div>}
+                        {(r.informed_consent || r.consent_signed) && (
+                          <div className="sm:col-span-2">
+                            <p className="text-xs font-medium text-gray-500 uppercase mb-1">Consentimiento informado</p>
+                            {r.informed_consent && <p className="text-sm text-gray-800 whitespace-pre-line mb-1">{r.informed_consent}</p>}
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.consent_signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {r.consent_signed ? '✓ Firmado' : 'Pendiente de firma'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       {r.treatment_items.length > 0 && (
                         <div>
@@ -333,23 +413,108 @@ export function MedicalRecordsAdmin() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo de consulta</label>
-                <input type="text" value={editing.chief_complaint} onChange={(e) => setEditing({ ...editing, chief_complaint: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: Rejuvenecimiento facial" />
+              {/* Motivo + Enfermedad actual */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Consulta</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Motivo de consulta</label>
+                  <input type="text" value={editing.chief_complaint} onChange={(e) => setEditing({ ...editing, chief_complaint: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: Rejuvenecimiento facial" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Enfermedad actual</label>
+                  <textarea value={editing.current_illness} onChange={(e) => setEditing({ ...editing, current_illness: e.target.value })}
+                    rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Descripción del motivo estético o problema actual…" />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Diagnóstico</label>
-                <input type="text" value={editing.diagnosis} onChange={(e) => setEditing({ ...editing, diagnosis: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Diagnóstico clínico" />
+              {/* Antecedentes */}
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Antecedentes</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Personales</label>
+                    <textarea value={editing.personal_history} onChange={(e) => setEditing({ ...editing, personal_history: e.target.value })}
+                      rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" placeholder="Enfermedades…" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Quirúrgicos</label>
+                    <textarea value={editing.surgical_history} onChange={(e) => setEditing({ ...editing, surgical_history: e.target.value })}
+                      rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" placeholder="Cirugias previas…" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Alérgicos</label>
+                    <textarea value={editing.allergic_history} onChange={(e) => setEditing({ ...editing, allergic_history: e.target.value })}
+                      rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" placeholder="Alergias conocidas…" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Farmacológicos</label>
+                    <textarea value={editing.pharmacological_history} onChange={(e) => setEditing({ ...editing, pharmacological_history: e.target.value })}
+                      rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" placeholder="Medicamentos actuales…" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Familiares</label>
+                    <textarea value={editing.family_history} onChange={(e) => setEditing({ ...editing, family_history: e.target.value })}
+                      rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" placeholder="Antecedentes familiares relevantes…" />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas clínicas</label>
-                <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
-                  rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                  placeholder="Observaciones, indicaciones post-tratamiento…" />
+              {/* Examen físico + Diagnóstico */}
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Evaluación clínica</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Examen físico</label>
+                  <textarea value={editing.physical_exam} onChange={(e) => setEditing({ ...editing, physical_exam: e.target.value })}
+                    rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Observaciones del profesional, estado general…" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Diagnóstico</label>
+                  <input type="text" value={editing.diagnosis} onChange={(e) => setEditing({ ...editing, diagnosis: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Diagnóstico clínico" />
+                </div>
+              </div>
+
+              {/* Plan + Evolución + Notas */}
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Plan y seguimiento</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Plan de tratamiento</label>
+                  <textarea value={editing.treatment_plan} onChange={(e) => setEditing({ ...editing, treatment_plan: e.target.value })}
+                    rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Procedimiento, frecuencia, indicaciones…" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Evolución</label>
+                  <textarea value={editing.evolution} onChange={(e) => setEditing({ ...editing, evolution: e.target.value })}
+                    rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Seguimiento del paciente en el tiempo…" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notas clínicas</label>
+                  <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+                    rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Observaciones, indicaciones post-tratamiento…" />
+                </div>
+              </div>
+
+              {/* Consentimiento informado */}
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Consentimiento informado</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Texto del consentimiento</label>
+                  <textarea value={editing.informed_consent} onChange={(e) => setEditing({ ...editing, informed_consent: e.target.value })}
+                    rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                    placeholder="Descripción del procedimiento, riesgos, aclaraciones…" />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={editing.consent_signed}
+                    onChange={(e) => setEditing({ ...editing, consent_signed: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900" />
+                  <span className="text-sm text-gray-700">Paciente firmó el consentimiento</span>
+                </label>
               </div>
 
               {/* Treatment items */}
