@@ -453,7 +453,7 @@ export function PatientProfile() {
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos administrativos</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <InfoRow label="EPS" value={patient.eps} />
-            <InfoRow label="Responsable" value={patient.legal_guardian} />
+            {(age(patient.date_of_birth) ?? 18) < 18 && <InfoRow label="Responsable" value={patient.legal_guardian} />}
             <InfoRow label="Contacto emergencia" value={patient.emergency_contact_name} />
             <InfoRow label="Parentesco" value={patient.emergency_contact_relation} />
             <InfoRow label="Tel. emergencia" value={patient.emergency_contact_phone} />
@@ -573,11 +573,13 @@ export function PatientProfile() {
                     <input type="text" value={editing.eps} onChange={(e) => setEditing({ ...editing, eps: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre de la EPS" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Responsable (si es menor)</label>
-                    <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre del responsable" />
-                  </div>
+                  {(age(editing.date_of_birth || null) ?? 18) < 18 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Responsable <span className="text-xs text-amber-600 font-normal">(menor de edad)</span></label>
+                      <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre del responsable" />
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Contacto de emergencia</label>

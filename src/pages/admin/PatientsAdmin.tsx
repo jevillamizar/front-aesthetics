@@ -79,6 +79,11 @@ function formatDob(iso: string | null) {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+function isMinor(dob: string) {
+  if (!dob) return false;
+  const diff = Date.now() - new Date(dob).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) < 18;
+}
 
 export function PatientsAdmin() {
   const navigate = useNavigate();
@@ -357,11 +362,13 @@ export function PatientsAdmin() {
                     <input type="text" value={editing.eps} onChange={(e) => setEditing({ ...editing, eps: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre de la EPS" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Responsable (si es menor de edad)</label>
-                    <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre completo del responsable" />
-                  </div>
+                  {isMinor(editing.date_of_birth) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Responsable <span className="text-xs text-amber-600 font-normal">(menor de edad)</span></label>
+                      <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre completo del responsable" />
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Contacto de emergencia</label>
