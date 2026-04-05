@@ -11,13 +11,19 @@ import {
   LogOut,
   Menu,
   X,
+  CalendarRange,
+  TrendingUp,
+  ClipboardList,
 } from 'lucide-react';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
+  { to: '/admin/calendar', icon: CalendarRange, label: 'Calendario', end: false },
+  { to: '/admin/revenue', icon: TrendingUp, label: 'Ingresos', end: false },
   { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },
+  { to: '/admin/medical-records', icon: ClipboardList, label: 'Historial Clínico', end: false },
   { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false },
   { to: '/admin/settings', icon: Settings, label: 'Configuración', end: false },
 ];
