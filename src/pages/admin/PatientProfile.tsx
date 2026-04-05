@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import {
-  ArrowLeft, CalendarDays, ChevronDown, ChevronUp, ClipboardList,
-  Loader2, Mail, MapPin, Phone, User,
+  ArrowLeft, CalendarDays, Camera, ChevronDown, ChevronUp, ClipboardList,
+  Loader2, Mail, MapPin, Pencil, Phone, Save, Trash2, User, X,
 } from 'lucide-react';
 
 type Patient = {
@@ -17,8 +17,38 @@ type Patient = {
   phone: string;
   email: string;
   address: string;
+  photo: string | null;
   notes: string;
 };
+
+type EditForm = {
+  document_type: string;
+  document_number: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  sex: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  photoFile: File | null;
+  clearPhoto: boolean;
+};
+
+const DOC_TYPES = [
+  { value: 'CC',  label: 'Cédula de Ciudadanía' },
+  { value: 'CE',  label: 'Cédula de Extranjería' },
+  { value: 'TI',  label: 'Tarjeta de Identidad' },
+  { value: 'PP',  label: 'Pasaporte' },
+  { value: 'RC',  label: 'Registro Civil' },
+  { value: 'NIT', label: 'NIT' },
+];
+const SEX_OPTIONS = [
+  { value: 'M', label: 'Masculino' },
+  { value: 'F', label: 'Femenino' },
+  { value: 'O', label: 'Otro' },
+];
 
 type TreatmentItem = {
   id: number;
@@ -92,6 +122,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 export function PatientProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [records, setRecords] = useState<MedicalRecord[]>([]);
@@ -100,20 +131,136 @@ export function PatientProfile() {
   const [expandedRecord, setExpandedRecord] = useState<number | null>(null);
   const [tab, setTab] = useState<'records' | 'appointments'>('records');
 
+  /* Edit modal state */
+  const [editing, setEditing] = useState<EditForm | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  /* Photo-only upload state */
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const reload = async (patientId: string) => {
+    const [pJson, rJson, aJson] = await Promise.all([
+      apiFetch(`/api/patients/${patientId}/`).then((r) => r.json()),
+      apiFetch(`/api/medical-records/?patient_id=${patientId}`).then((r) => r.json()),
+      apiFetch(`/api/appointments/?patient_id=${patientId}`).then((r) => r.json()),
+    ]);
+    setPatient(pJson.patient || null);
+    setRecords(rJson.records || []);
+    setAppointments((aJson.appointments || []).sort((a: Appointment, b: Appointment) =>
+      b.starts_at.localeCompare(a.starts_at)));
+  };
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    Promise.all([
-      apiFetch(`/api/patients/${id}/`).then((r) => r.json()),
-      apiFetch(`/api/medical-records/?patient_id=${id}`).then((r) => r.json()),
-      apiFetch(`/api/appointments/?patient_id=${id}`).then((r) => r.json()),
-    ]).then(([pJson, rJson, aJson]) => {
-      setPatient(pJson.patient || null);
-      setRecords(rJson.records || []);
-      setAppointments((aJson.appointments || []).sort((a: Appointment, b: Appointment) =>
-        b.starts_at.localeCompare(a.starts_at)));
-    }).finally(() => setLoading(false));
+    reload(id).finally(() => setLoading(false));
   }, [id]);
+
+  const openEdit = () => {
+    if (!patient) return;
+    setEditError('');
+    setPhotoPreview(null);
+    setEditing({
+      document_type: patient.document_type,
+      document_number: patient.document_number,
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      date_of_birth: patient.date_of_birth ?? '',
+      sex: patient.sex,
+      phone: patient.phone,
+      email: patient.email,
+      address: patient.address,
+      notes: patient.notes,
+      photoFile: null,
+      clearPhoto: false,
+    });
+  };
+
+  const handleEditPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editing) return;
+    setEditing({ ...editing, photoFile: file, clearPhoto: false });
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    if (!editing || !patient) return;
+    if (!editing.first_name.trim() || !editing.last_name.trim()) {
+      setEditError('Nombres y apellidos son obligatorios.');
+      return;
+    }
+    setSaving(true);
+    setEditError('');
+    try {
+      let body: FormData | string;
+      if (editing.photoFile) {
+        const fd = new FormData();
+        Object.entries(editing).forEach(([k, v]) => {
+          if (k === 'photoFile' || k === 'clearPhoto') return;
+          fd.append(k, v as string ?? '');
+        });
+        fd.append('photo', editing.photoFile);
+        body = fd;
+      } else {
+        body = JSON.stringify({
+          document_type: editing.document_type,
+          document_number: editing.document_number,
+          first_name: editing.first_name,
+          last_name: editing.last_name,
+          date_of_birth: editing.date_of_birth || null,
+          sex: editing.sex,
+          phone: editing.phone,
+          email: editing.email,
+          address: editing.address,
+          notes: editing.notes,
+          photo: editing.clearPhoto ? '' : undefined,
+        });
+      }
+      const res = await apiFetch(`/api/patients/${patient.id}/`, { method: 'PUT', body });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || 'Error al guardar');
+      }
+      const json = await res.json();
+      setPatient(json.patient);
+      setEditing(null);
+      setPhotoPreview(null);
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!patient) return;
+    if (!confirm(`¿Eliminar a ${patient.first_name} ${patient.last_name}? Esta acción no se puede deshacer.`)) return;
+    await apiFetch(`/api/patients/${patient.id}/`, { method: 'DELETE' });
+    navigate('/admin/patients');
+  };
+
+  /* Quick photo upload from avatar area */
+  const handleAvatarPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !patient) return;
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('first_name', patient.first_name);
+      fd.append('last_name', patient.last_name);
+      fd.append('photo', file);
+      const res = await apiFetch(`/api/patients/${patient.id}/`, { method: 'PUT', body: fd });
+      if (res.ok) {
+        const json = await res.json();
+        setPatient(json.patient);
+      }
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
 
   if (loading) {
     return (
@@ -148,9 +295,36 @@ export function PatientProfile() {
       {/* Hero card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
         <div className="flex flex-wrap items-start gap-5">
-          {/* Avatar */}
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <User className="w-8 h-8 text-gray-300" />
+
+          {/* Photo / Avatar with upload */}
+          <div className="relative flex-shrink-0 group">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarPhotoChange}
+            />
+            <div
+              onClick={() => photoInputRef.current?.click()}
+              className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 cursor-pointer ring-2 ring-transparent group-hover:ring-gray-300 transition-all"
+            >
+              {patient.photo
+                ? <img src={patient.photo} alt="Foto" className="w-full h-full object-cover" />
+                : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <User className="w-10 h-10 text-gray-300" />
+                  </div>
+                )}
+            </div>
+            <div
+              onClick={() => photoInputRef.current?.click()}
+              className="absolute bottom-0 right-0 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center cursor-pointer shadow-sm"
+            >
+              {uploadingPhoto
+                ? <Loader2 className="w-3 h-3 text-white animate-spin" />
+                : <Camera className="w-3 h-3 text-white" />}
+            </div>
           </div>
 
           <div className="flex-1 min-w-0">
@@ -187,28 +361,40 @@ export function PatientProfile() {
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="flex gap-4 flex-shrink-0">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{records.length}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Registros</p>
+          {/* Stats + Actions */}
+          <div className="flex flex-col gap-3 items-end flex-shrink-0">
+            <div className="flex gap-2">
+              <button onClick={openEdit}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <Pencil className="w-3.5 h-3.5" /> Editar
+              </button>
+              <button onClick={handleDelete}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" /> Eliminar
+              </button>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Citas</p>
-            </div>
-            {totalRevenue > 0 && (
+            <div className="flex gap-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{fmtCurrency(totalRevenue)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Facturado</p>
+                <p className="text-2xl font-bold text-gray-900">{records.length}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Registros</p>
               </div>
-            )}
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">{appointments.length}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Citas</p>
+              </div>
+              {totalRevenue > 0 && (
+                <div className="text-center">
+                  <p className="text-xl font-bold text-gray-900">{fmtCurrency(totalRevenue)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Facturado</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {patient.notes && (
           <div className="mt-4 pt-4 border-t border-gray-50">
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Notas clínicas</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Notas</p>
             <p className="text-sm text-gray-700 whitespace-pre-line">{patient.notes}</p>
           </div>
         )}
@@ -229,6 +415,128 @@ export function PatientProfile() {
           <InfoRow label="Dirección" value={patient.address} />
         </div>
       </div>
+
+      {/* ─── Edit Modal ──────────────────────────────────────────────── */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-900">Editar Paciente</h2>
+              <button onClick={() => setEditing(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {editError && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{editError}</div>}
+
+              {/* Photo */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
+                  {photoPreview || patient.photo
+                    ? <img src={photoPreview ?? patient.photo ?? ''} alt="Foto" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><User className="w-8 h-8 text-gray-300" /></div>}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <Camera className="w-3.5 h-3.5 text-gray-500" />
+                    {editing.photoFile ? 'Cambiar foto' : 'Subir foto'}
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={handleEditPhotoChange} />
+                  </label>
+                  {(patient.photo || editing.photoFile) && !editing.clearPhoto && (
+                    <button type="button" onClick={() => { setEditing({ ...editing, photoFile: null, clearPhoto: true }); setPhotoPreview(null); }}
+                      className="text-xs text-red-500 hover:text-red-700 text-left">
+                      Eliminar foto
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Documento */}
+              <div className="grid grid-cols-[1fr_1.5fr] gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de documento</label>
+                  <select value={editing.document_type} onChange={(e) => setEditing({ ...editing, document_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                    <option value="">Seleccionar…</option>
+                    {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Número de documento</label>
+                  <input type="text" value={editing.document_number} onChange={(e) => setEditing({ ...editing, document_number: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombres <span className="text-red-500">*</span></label>
+                  <input type="text" value={editing.first_name} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos <span className="text-red-500">*</span></label>
+                  <input type="text" value={editing.last_name} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
+                  <input type="date" value={editing.date_of_birth} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                  <select value={editing.sex} onChange={(e) => setEditing({ ...editing, sex: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                    <option value="">Seleccionar…</option>
+                    {SEX_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  <input type="tel" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                  <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                <input type="text" value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+                  rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={handleSave} disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs: Historial / Citas */}
       <div className="border-b border-gray-200 mb-5">
