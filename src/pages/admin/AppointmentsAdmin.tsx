@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { AtenderModal } from '../../components/AtenderModal';
 import {
-  CalendarDays, ChevronDown, ChevronUp, Clock, Loader2, Pencil, Plus, Save, Stethoscope, Trash2, UserPlus, X,
+  CalendarDays, CheckCircle2, ChevronDown, ChevronUp, ClipboardList,
+  Clock, CreditCard, FileSignature, Loader2, Pencil, Play, Plus,
+  Save, Trash2, UserPlus, X,
 } from 'lucide-react';
 
-type Patient = { id: number; first_name: string; last_name: string; email: string; phone: string };
+type Patient   = { id: number; first_name: string; last_name: string; email: string; phone: string };
+type Treatment = { id: number; name: string; duration_minutes: number; price?: number };
+type Doctor    = { id: number; first_name: string; last_name: string; email: string };
 
 const DOC_TYPES = [
   { value: 'CC',  label: 'CC — Cédula de Ciudadanía' },
@@ -17,7 +21,22 @@ const DOC_TYPES = [
 ];
 
 const EMPTY_NEW_PATIENT = { document_type: '', document_number: '', first_name: '', last_name: '', phone: '', email: '' };
-type Treatment = { id: number; name: string; duration_minutes: number };
+
+type PaymentInfo = {
+  id: number;
+  amount: number;
+  method: string;
+  status: string;
+  notes: string;
+  paid_at: string | null;
+};
+
+type ConsentInfo = {
+  id: number;
+  signed: boolean;
+  signed_at: string | null;
+  signed_by_name: string;
+};
 
 type Appointment = {
   id: number;
@@ -31,14 +50,20 @@ type Appointment = {
   patient_phone: string;
   treatment_id: number | null;
   treatment_name: string | null;
+  treatment_price: number | null;
   doctor_id: number | null;
+  doctor_name: string | null;
   doctor_email: string | null;
+  payment: PaymentInfo | null;
+  medical_record_id: number | null;
+  consent: ConsentInfo | null;
 };
 
 type FormData = {
   id?: number;
   patient_id: number | '';
   treatment_id: number | '';
+  doctor_id: number | '';
   date: string;
   time: string;
   duration_minutes: number;
@@ -49,19 +74,35 @@ type FormData = {
 const empty: FormData = {
   patient_id: '',
   treatment_id: '',
+  doctor_id: '',
   date: '',
   time: '',
   duration_minutes: 60,
-  status: 'SCHEDULED',
+  status: 'PENDING',
   notes: '',
 };
 
 const STATUS_OPTIONS = [
-  { value: 'SCHEDULED', label: 'Programada', color: 'bg-blue-50 text-blue-700' },
-  { value: 'CONFIRMED', label: 'Confirmada', color: 'bg-green-50 text-green-700' },
-  { value: 'COMPLETED', label: 'Completada', color: 'bg-gray-100 text-gray-600' },
-  { value: 'CANCELED',  label: 'Cancelada',  color: 'bg-red-50 text-red-600' },
-  { value: 'NO_SHOW',   label: 'No asistió', color: 'bg-amber-50 text-amber-700' },
+  { value: 'PENDING',     label: 'Pendiente',  color: 'bg-amber-50 text-amber-700',   dot: 'bg-amber-400' },
+  { value: 'SCHEDULED',  label: 'Programada', color: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-400' },
+  { value: 'IN_PROGRESS',label: 'En curso',   color: 'bg-violet-50 text-violet-700', dot: 'bg-violet-400' },
+  { value: 'COMPLETED',  label: 'Completada', color: 'bg-green-50 text-green-700',   dot: 'bg-green-400' },
+  { value: 'CANCELED',   label: 'Cancelada',  color: 'bg-red-50 text-red-600',       dot: 'bg-red-400' },
+  { value: 'NO_SHOW',    label: 'No asistió', color: 'bg-gray-100 text-gray-500',    dot: 'bg-gray-400' },
+];
+
+const PAYMENT_STATUS = {
+  PENDING:  { label: 'Pendiente', color: 'bg-amber-50 text-amber-700' },
+  PAID:     { label: 'Pagado',    color: 'bg-green-50 text-green-700' },
+  PARTIAL:  { label: 'Parcial',   color: 'bg-blue-50 text-blue-700' },
+  REFUNDED: { label: 'Reembolso',  color: 'bg-gray-100 text-gray-500' },
+};
+
+const PAYMENT_METHODS = [
+  { value: 'CASH',     label: 'Efectivo' },
+  { value: 'CARD',     label: 'Tarjeta' },
+  { value: 'TRANSFER', label: 'Transferencia' },
+  { value: 'OTHER',    label: 'Otro' },
 ];
 
 function statusInfo(s: string) {
@@ -89,31 +130,37 @@ function toInputTime(iso: string) {
 }
 
 export function AppointmentsAdmin() {
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [treatments, setTreatments] = useState<Treatment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [patients, setPatients]         = useState<Patient[]>([]);
+  const [treatments, setTreatments]     = useState<Treatment[]>([]);
+  const [doctors, setDoctors]           = useState<Doctor[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState('');
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [statusFilter, setStatusFilter]   = useState('');
+  const [dateFilter, setDateFilter]       = useState('');
   const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
-  const [editing, setEditing] = useState<FormData | null>(null);
-  const [showNewPatient, setShowNewPatient] = useState(false);
-  const [newPatient, setNewPatient] = useState({ ...EMPTY_NEW_PATIENT });
-  const [creatingPatient, setCreatingPatient] = useState(false);
-  const [newPatientError, setNewPatientError] = useState('');
-  const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
-  const [historial, setHistorial] = useState<Appointment[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [editing, setEditing]       = useState<FormData | null>(null);
+  const [showNewPatient, setShowNewPatient]     = useState(false);
+  const [newPatient, setNewPatient]             = useState({ ...EMPTY_NEW_PATIENT });
+  const [creatingPatient, setCreatingPatient]   = useState(false);
+  const [newPatientError, setNewPatientError]   = useState('');
+
+  const [paymentForm, setPaymentForm]   = useState<Record<number, { amount: string; method: string; status: string; notes: string }>>({});
+  const [savingPay, setSavingPay]       = useState<number | null>(null);
+  const [transiting, setTransiting]     = useState<number | null>(null);
+
+  const [historial, setHistorial]             = useState<Appointment[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
   const [historialExpanded, setHistorialExpanded] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => setNow(Date.now()), 60_000);
+    intervalRef.current = setInterval(() => {}, 60_000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
@@ -133,22 +180,21 @@ export function AppointmentsAdmin() {
   }, [statusFilter, dateFilter, patientFilter]);
 
   const loadMeta = async () => {
-    const [pRes, tRes] = await Promise.all([
+    const [pRes, tRes, dRes] = await Promise.all([
       apiFetch('/api/patients/'),
       apiFetch('/api/treatments/'),
+      apiFetch('/api/doctors/'),
     ]);
-    const pJson = await pRes.json();
-    const tJson = await tRes.json();
-    setPatients(pJson.patients || []);
-    setTreatments(tJson.treatments || []);
+    setPatients((await pRes.json()).patients || []);
+    setTreatments((await tRes.json()).treatments || []);
+    setDoctors((await dRes.json()).doctors || []);
   };
 
   const loadHistorial = useCallback(async () => {
     setHistorialLoading(true);
     try {
       const res = await apiFetch('/api/appointments/?past=1');
-      const json = await res.json();
-      setHistorial(json.appointments || []);
+      setHistorial((await res.json()).appointments || []);
     } finally {
       setHistorialLoading(false);
     }
@@ -173,6 +219,7 @@ export function AppointmentsAdmin() {
       id: a.id,
       patient_id: a.patient_id,
       treatment_id: a.treatment_id ?? '',
+      doctor_id: a.doctor_id ?? '',
       date: toInputDate(a.starts_at),
       time: toInputTime(a.starts_at),
       duration_minutes: Math.round(durMs / 60000),
@@ -187,45 +234,84 @@ export function AppointmentsAdmin() {
       setError('Paciente, fecha y hora son obligatorios.');
       return;
     }
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
       const starts = new Date(`${editing.date}T${editing.time}:00`);
-      const ends = new Date(starts.getTime() + editing.duration_minutes * 60000);
-
+      const ends   = new Date(starts.getTime() + editing.duration_minutes * 60000);
       const body = {
-        patient_id: editing.patient_id,
+        patient_id:   editing.patient_id,
         treatment_id: editing.treatment_id || null,
-        starts_at: starts.toISOString(),
-        ends_at: ends.toISOString(),
-        status: editing.status,
-        notes: editing.notes,
+        doctor_id:    editing.doctor_id || null,
+        starts_at:    starts.toISOString(),
+        ends_at:      ends.toISOString(),
+        status:       editing.status,
+        notes:        editing.notes,
       };
-
       const isNew = !editing.id;
       const url = isNew ? '/api/appointments/' : `/api/appointments/${editing.id}/`;
       const res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Error al guardar');
-      }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'Error'); }
       setEditing(null);
       await load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAtender = (id: number) => {
-    setAtenderApptId(id);
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar esta cita?')) return;
     await apiFetch(`/api/appointments/${id}/`, { method: 'DELETE' });
-    await load();
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const handleTransition = async (apptId: number, newStatus: string) => {
+    setTransiting(apptId);
+    try {
+      const res = await apiFetch(`/api/appointments/${apptId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setAppointments((prev) => prev.map((a) => a.id === apptId ? json.appointment : a));
+      }
+    } finally { setTransiting(null); }
+  };
+
+  const handleSavePayment = async (apptId: number) => {
+    const form = paymentForm[apptId];
+    if (!form) return;
+    setSavingPay(apptId);
+    try {
+      const res = await apiFetch(`/api/appointments/${apptId}/payment/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: parseFloat(form.amount) || 0,
+          method: form.method,
+          status: form.status,
+          notes:  form.notes,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setAppointments((prev) =>
+          prev.map((a) => a.id === apptId ? { ...a, payment: json.payment } : a)
+        );
+        setPaymentForm((prev) => { const n = { ...prev }; delete n[apptId]; return n; });
+      }
+    } finally { setSavingPay(null); }
+  };
+
+  const initPaymentForm = (a: Appointment) => {
+    setPaymentForm((prev) => ({
+      ...prev,
+      [a.id]: {
+        amount: a.payment ? String(a.payment.amount) : (a.treatment_price ? String(a.treatment_price) : ''),
+        method: a.payment?.method ?? 'CASH',
+        status: a.payment?.status ?? 'PENDING',
+        notes:  a.payment?.notes ?? '',
+      },
+    }));
   };
 
   const handleCreatePatient = async () => {
@@ -233,13 +319,9 @@ export function AppointmentsAdmin() {
       setNewPatientError('Nombres y apellidos son obligatorios.');
       return;
     }
-    setCreatingPatient(true);
-    setNewPatientError('');
+    setCreatingPatient(true); setNewPatientError('');
     try {
-      const res = await apiFetch('/api/patients/', {
-        method: 'POST',
-        body: JSON.stringify(newPatient),
-      });
+      const res = await apiFetch('/api/patients/', { method: 'POST', body: JSON.stringify(newPatient) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.detail || 'Error al crear paciente');
       const created: Patient = d.patient;
@@ -249,357 +331,407 @@ export function AppointmentsAdmin() {
       setNewPatient({ ...EMPTY_NEW_PATIENT });
     } catch (e: unknown) {
       setNewPatientError(e instanceof Error ? e.message : 'Error');
-    } finally {
-      setCreatingPatient(false);
-    }
+    } finally { setCreatingPatient(false); }
   };
 
   const onTreatmentChange = (tid: number | '') => {
     const t = treatments.find((t) => t.id === Number(tid));
-    setEditing((prev) => prev ? {
-      ...prev,
-      treatment_id: tid,
-      duration_minutes: t?.duration_minutes ?? prev.duration_minutes,
-    } : prev);
+    setEditing((prev) => prev ? { ...prev, treatment_id: tid, duration_minutes: t?.duration_minutes ?? prev.duration_minutes } : prev);
   };
 
+  /* ── helpers ── */
+  const payBadge = (p: PaymentInfo | null) => {
+    if (!p) return { label: 'Sin pago', cls: 'bg-gray-100 text-gray-400' };
+    const m = PAYMENT_STATUS[p.status as keyof typeof PAYMENT_STATUS];
+    return m ? { label: m.label, cls: m.color } : { label: p.status, cls: 'bg-gray-100 text-gray-500' };
+  };
+
+  const ACTION = {
+    PENDING:     { label: 'Confirmar', next: 'SCHEDULED',   cls: 'bg-blue-600 hover:bg-blue-700' },
+    SCHEDULED:   { label: 'Iniciar',   next: 'IN_PROGRESS', cls: 'bg-violet-600 hover:bg-violet-700' },
+    IN_PROGRESS: { label: 'Finalizar', next: 'COMPLETED',   cls: 'bg-green-600 hover:bg-green-700' },
+  } as const;
+
   return (
-    <div>
+    <div className="max-w-4xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Citas</h1>
-          <p className="text-gray-500 mt-1 text-sm">Gestiona la agenda de la clínica</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gray-900 rounded-xl"><CalendarDays className="w-5 h-5 text-white" /></div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Citas</h1>
+            <p className="text-sm text-gray-500">{appointments.length} cita{appointments.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-        <button
-          onClick={openNew}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-        >
+        <button onClick={openNew}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
           <Plus className="w-4 h-4" /> Nueva Cita
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-        >
+      <div className="flex flex-wrap gap-2">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
           <option value="">Todos los estados</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
+          {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-        />
-        <select
-          value={patientFilter}
-          onChange={(e) => setPatientFilter(Number(e.target.value) || '')}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-        >
+        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900" />
+        <select value={patientFilter} onChange={(e) => setPatientFilter(Number(e.target.value) || '')}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
           <option value="">Todos los pacientes</option>
-          {patients.map((p) => (
-            <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
-          ))}
+          {patients.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
         </select>
         {(statusFilter || dateFilter || patientFilter) && (
-          <button
-            onClick={() => { setStatusFilter(''); setDateFilter(''); setPatientFilter(''); }}
-            className="px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Limpiar
-          </button>
+          <button onClick={() => { setStatusFilter(''); setDateFilter(''); setPatientFilter(''); }}
+            className="px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50">Limpiar</button>
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Appointment list */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-          </div>
+          <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>
         ) : appointments.length === 0 ? (
           <div className="py-16 text-center">
             <CalendarDays className="w-8 h-8 text-gray-200 mx-auto mb-2" />
             <p className="text-gray-400 text-sm">No hay citas registradas</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Fecha</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Hora</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Paciente</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Tratamiento</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {appointments.map((a) => {
-                  const { date, time } = toLocal(a.starts_at);
-                  const st = statusInfo(a.status);
-                  return (
-                    <tr key={a.id} className="hover:bg-gray-50/40 transition-colors">
-                      <td className="px-4 py-3 text-gray-700">{date}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-gray-500">
-                          <Clock className="w-3.5 h-3.5" />{time}
+          <div className="divide-y divide-gray-50">
+            {appointments.map((a) => {
+              const { date, time } = toLocal(a.starts_at);
+              const st  = statusInfo(a.status);
+              const pay = payBadge(a.payment);
+              const isOpen = expandedId === a.id;
+              const pf    = paymentForm[a.id];
+              const isSavingPay = savingPay === a.id;
+              const isTransiting = transiting === a.id;
+              const action = ACTION[a.status as keyof typeof ACTION];
+
+              return (
+                <div key={a.id}>
+                  {/* Row */}
+                  <div
+                    className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                    onClick={() => setExpandedId(isOpen ? null : a.id)}
+                  >
+                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+
+                    {/* Date/time */}
+                    <div className="flex-shrink-0 text-center w-14">
+                      <p className="text-xs font-semibold text-gray-900">{date.split('/').slice(0,2).join('/')}</p>
+                      <p className="text-xs text-gray-400 flex items-center justify-center gap-0.5"><Clock className="w-3 h-3" />{time}</p>
+                    </div>
+
+                    {/* Main info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{a.patient_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{a.treatment_name ?? 'Sin servicio'}{a.doctor_name ? ` · ${a.doctor_name}` : ''}</p>
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${pay.cls}`}>{pay.label}</span>
+                      {a.consent ? (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {a.consent.signed ? 'Firmado' : 'Sin firmar'}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{a.patient_name}</p>
-                        <p className="text-xs text-gray-400">{a.patient_email}</p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{a.treatment_name ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>
-                          {st.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex gap-1">
-                          {(() => {
-                            const startsMs = new Date(a.starts_at).getTime();
-                            const canAtender = now >= startsMs - 15 * 60 * 1000
-                              && ['SCHEDULED', 'CONFIRMED'].includes(a.status);
-                            return canAtender ? (
-                              <button
-                                onClick={() => handleAtender(a.id)}
-                                className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="Atender cita"
-                              >
-                                <Stethoscope className="w-4 h-4" />
-                              </button>
-                            ) : null;
-                          })()}
-                          {!['CONFIRMED', 'COMPLETED'].includes(a.status) && (
-                            <button
-                              onClick={() => openEdit(a)}
-                              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(a.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Sin consent.</span>
+                      )}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.medical_record_id ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
+                        {a.medical_record_id ? 'HC ✓' : 'Sin HC'}
+                      </span>
+                    </div>
+
+                    {/* Actions - stop propagation */}
+                    <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {!['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
+                        <button onClick={() => openEdit(a)}
+                          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => handleDelete(a.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded panel */}
+                  {isOpen && (
+                    <div className="px-5 pb-5 bg-gray-50/40 border-t border-gray-100 space-y-4 pt-4">
+
+                      {/* Detail grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
+                          <p className="text-xs text-gray-400 mb-0.5">Paciente</p>
+                          <p className="text-sm font-medium text-gray-900">{a.patient_name}</p>
+                          {a.patient_phone && <p className="text-xs text-gray-400">{a.patient_phone}</p>}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
+                          <p className="text-xs text-gray-400 mb-0.5">Servicio</p>
+                          <p className="text-sm font-medium text-gray-900">{a.treatment_name ?? '—'}</p>
+                          {a.treatment_price != null && <p className="text-xs text-gray-400">${a.treatment_price.toLocaleString()}</p>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
+                          <p className="text-xs text-gray-400 mb-0.5">Médico</p>
+                          <p className="text-sm font-medium text-gray-900">{a.doctor_name ?? '—'}</p>
+                          {a.doctor_email && <p className="text-xs text-gray-400 truncate">{a.doctor_email}</p>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
+                          <p className="text-xs text-gray-400 mb-0.5">Fecha y hora</p>
+                          <p className="text-sm font-medium text-gray-900">{date}</p>
+                          <p className="text-xs text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{time}</p>
+                        </div>
+                      </div>
+
+                      {a.notes && (
+                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
+                          <p className="text-xs text-gray-400 mb-0.5">Notas</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-line">{a.notes}</p>
+                        </div>
+                      )}
+
+                      {/* Linked modules row */}
+                      <div className="grid grid-cols-3 gap-3">
+
+                        {/* Payment panel */}
+                        <div className={`rounded-xl border px-3 py-3 ${a.payment ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5" /> Pago
+                            </p>
+                            {!pf && (
+                              <button onClick={() => initPaymentForm(a)}
+                                className="text-xs text-blue-600 hover:underline">{a.payment ? 'Editar' : 'Registrar'}</button>
+                            )}
+                          </div>
+                          {a.payment && !pf ? (
+                            <>
+                              <p className="text-sm font-semibold text-gray-900">${a.payment.amount.toLocaleString()}</p>
+                              <p className="text-xs text-gray-400">{PAYMENT_METHODS.find((m) => m.value === a.payment!.method)?.label ?? a.payment.method}</p>
+                              <span className={`mt-1 inline-block text-xs font-medium px-2 py-0.5 rounded-full ${PAYMENT_STATUS[a.payment.status as keyof typeof PAYMENT_STATUS]?.color ?? 'bg-gray-100 text-gray-500'}`}>
+                                {PAYMENT_STATUS[a.payment.status as keyof typeof PAYMENT_STATUS]?.label ?? a.payment.status}
+                              </span>
+                            </>
+                          ) : !pf ? (
+                            <p className="text-xs text-gray-400">Sin pago registrado</p>
+                          ) : null}
+                          {pf && (
+                            <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                              <input type="number" placeholder="Monto" value={pf.amount}
+                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], amount: e.target.value } }))}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                              <select value={pf.method}
+                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], method: e.target.value } }))}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-gray-900">
+                                {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                              </select>
+                              <select value={pf.status}
+                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], status: e.target.value } }))}
+                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-gray-900">
+                                {Object.entries(PAYMENT_STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
+                              </select>
+                              <div className="flex gap-1 pt-0.5">
+                                <button onClick={() => handleSavePayment(a.id)} disabled={isSavingPay}
+                                  className="flex-1 flex items-center justify-center gap-1 py-1 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50">
+                                  {isSavingPay ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Guardar
+                                </button>
+                                <button onClick={() => setPaymentForm((prev) => { const n = { ...prev }; delete n[a.id]; return n; })}
+                                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Consent panel */}
+                        <div className={`rounded-xl border px-3 py-3 ${a.consent ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
+                          <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
+                            <FileSignature className="w-3.5 h-3.5" /> Consentimiento
+                          </p>
+                          {a.consent ? (
+                            <>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                                {a.consent.signed ? 'Firmado' : 'Pendiente de firma'}
+                              </span>
+                              {a.consent.signed_by_name && <p className="text-xs text-gray-400 mt-1">{a.consent.signed_by_name}</p>}
+                            </>
+                          ) : (
+                            <p className="text-xs text-gray-400">Sin consentimiento</p>
+                          )}
+                          <button onClick={() => navigate('/admin/consents')}
+                            className="mt-2 text-xs text-blue-600 hover:underline block">Ver consentimientos →</button>
+                        </div>
+
+                        {/* Historia clínica panel */}
+                        <div className={`rounded-xl border px-3 py-3 ${a.medical_record_id ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100'}`}>
+                          <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
+                            <ClipboardList className="w-3.5 h-3.5" /> Historia Clínica
+                          </p>
+                          {a.medical_record_id ? (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">HC #{a.medical_record_id}</span>
+                          ) : (
+                            <p className="text-xs text-gray-400">Sin registro clínico</p>
+                          )}
+                          <button onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
+                            className="mt-2 text-xs text-blue-600 hover:underline block">Ver perfil paciente →</button>
+                        </div>
+                      </div>
+
+                      {/* Status action buttons */}
+                      <div className="flex items-center gap-3 pt-1">
+                        {action && (
+                          <button
+                            onClick={() => handleTransition(a.id, action.next)}
+                            disabled={isTransiting}
+                            className={`flex items-center gap-2 px-4 py-2 ${action.cls} text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors`}
+                          >
+                            {isTransiting
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Play className="w-4 h-4" />}
+                            {action.label}
+                          </button>
+                        )}
+                        {a.status === 'COMPLETED' && (
+                          <button
+                            onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
+                          >
+                            <CheckCircle2 className="w-4 h-4" /> Ver historial
+                          </button>
+                        )}
+                        <span className={`ml-auto text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Historial */}
-      <div className="mt-8">
-        <button
-          onClick={() => setHistorialExpanded((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-gray-200 hover:bg-gray-50/50 transition-colors"
-        >
+      {/* Historial colapsable */}
+      <div>
+        <button onClick={() => setHistorialExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-gray-200 hover:bg-gray-50/50 transition-colors">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Historial de Citas</span>
+            <span className="text-sm font-medium text-gray-700">Historial</span>
             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{historial.length}</span>
           </div>
-          {historialExpanded
-            ? <ChevronUp className="w-4 h-4 text-gray-400" />
-            : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          {historialExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
-
         {historialExpanded && (
-          <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 divide-y divide-gray-50">
             {historialLoading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
-              </div>
+              <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>
             ) : historial.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-gray-400 text-sm">Sin registros en el historial</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/60">
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Fecha</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Hora</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Paciente</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Tratamiento</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Estado</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">Notas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {historial.map((a) => {
-                      const { date, time } = toLocal(a.starts_at);
-                      const st = statusInfo(a.status);
-                      return (
-                        <tr key={a.id} className="hover:bg-gray-50/40 transition-colors">
-                          <td className="px-4 py-3 text-gray-700">{date}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center gap-1 text-gray-500">
-                              <Clock className="w-3.5 h-3.5" />{time}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-gray-900">{a.patient_name}</p>
-                            <p className="text-xs text-gray-400">{a.patient_email}</p>
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">{a.treatment_name ?? '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>
-                              {st.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">{a.notes || '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <div className="py-8 text-center"><p className="text-gray-400 text-sm">Sin registros</p></div>
+            ) : historial.map((a) => {
+              const { date, time } = toLocal(a.starts_at);
+              const st = statusInfo(a.status);
+              return (
+                <div key={a.id} className="flex items-center gap-4 px-5 py-3">
+                  <div className="flex-shrink-0 text-xs text-gray-400 w-20">
+                    <p>{date.split('/').slice(0,2).join('/')}</p>
+                    <p className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{time}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{a.patient_name}</p>
+                    <p className="text-xs text-gray-400 truncate">{a.treatment_name ?? '—'}</p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Modal */}
+      {/* Create/Edit Modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editing.id ? 'Editar Cita' : 'Nueva Cita'}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">{editing.id ? 'Editar Cita' : 'Nueva Cita'}</h2>
               <button onClick={() => setEditing(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-
             <div className="px-6 py-5 space-y-4">
-              {error && (
-                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>
-              )}
+              {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
 
               {/* Patient */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Paciente <span className="text-red-500">*</span></label>
-                <select
-                  value={editing.patient_id}
+                <select value={editing.patient_id}
                   onChange={(e) => {
-                    if (e.target.value === '__new__') {
-                      setShowNewPatient(true);
-                      setEditing({ ...editing, patient_id: '' });
-                    } else {
-                      setShowNewPatient(false);
-                      setEditing({ ...editing, patient_id: Number(e.target.value) || '' });
-                    }
+                    if (e.target.value === '__new__') { setShowNewPatient(true); setEditing({ ...editing, patient_id: '' }); }
+                    else { setShowNewPatient(false); setEditing({ ...editing, patient_id: Number(e.target.value) || '' }); }
                   }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                >
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
                   <option value="">Selecciona un paciente</option>
                   <option value="__new__">✚ Nuevo paciente…</option>
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.last_name}, {p.first_name} {p.email ? `— ${p.email}` : ''}
-                    </option>
-                  ))}
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}{p.email ? ` — ${p.email}` : ''}</option>)}
                 </select>
-
-                {/* Inline new-patient mini-form */}
                 {showNewPatient && (
                   <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                        <UserPlus className="w-3.5 h-3.5" /> Nuevo paciente
-                      </span>
-                      <button type="button" onClick={() => { setShowNewPatient(false); setNewPatientError(''); }}
-                        className="text-gray-400 hover:text-gray-600 transition-colors">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 uppercase"><UserPlus className="w-3.5 h-3.5" /> Nuevo paciente</span>
+                      <button type="button" onClick={() => { setShowNewPatient(false); setNewPatientError(''); }} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
                     </div>
-
-                    {newPatientError && (
-                      <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{newPatientError}</p>
-                    )}
-
+                    {newPatientError && <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{newPatientError}</p>}
                     <div className="grid grid-cols-[1fr_1.4fr] gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Tipo doc.</label>
-                        <select value={newPatient.document_type}
-                          onChange={(e) => setNewPatient({ ...newPatient, document_type: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                        <select value={newPatient.document_type} onChange={(e) => setNewPatient({ ...newPatient, document_type: e.target.value })}
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
                           <option value="">—</option>
                           {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Número</label>
-                        <input type="text" value={newPatient.document_number}
-                          onChange={(e) => setNewPatient({ ...newPatient, document_number: e.target.value })}
-                          placeholder="12345678"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                        <input type="text" value={newPatient.document_number} onChange={(e) => setNewPatient({ ...newPatient, document_number: e.target.value })}
+                          placeholder="12345678" className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
                       </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Nombres <span className="text-red-500">*</span></label>
-                        <input type="text" value={newPatient.first_name}
-                          onChange={(e) => setNewPatient({ ...newPatient, first_name: e.target.value })}
-                          placeholder="Nombres"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                        <input type="text" value={newPatient.first_name} onChange={(e) => setNewPatient({ ...newPatient, first_name: e.target.value })}
+                          placeholder="Nombres" className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Apellidos <span className="text-red-500">*</span></label>
-                        <input type="text" value={newPatient.last_name}
-                          onChange={(e) => setNewPatient({ ...newPatient, last_name: e.target.value })}
-                          placeholder="Apellidos"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                        <input type="text" value={newPatient.last_name} onChange={(e) => setNewPatient({ ...newPatient, last_name: e.target.value })}
+                          placeholder="Apellidos" className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
                       </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
-                        <input type="tel" value={newPatient.phone}
-                          onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                          placeholder="300 000 0000"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                        <input type="tel" value={newPatient.phone} onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
+                          placeholder="300 000 0000" className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Correo</label>
-                        <input type="email" value={newPatient.email}
-                          onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
-                          placeholder="correo@email.com"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                        <input type="email" value={newPatient.email} onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
+                          placeholder="correo@email.com" className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
                       </div>
                     </div>
-
                     <button type="button" onClick={handleCreatePatient} disabled={creatingPatient}
                       className="w-full inline-flex items-center justify-center gap-2 py-2 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                      {creatingPatient
-                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        : <UserPlus className="w-3.5 h-3.5" />}
-                      Crear y seleccionar
+                      {creatingPatient ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />} Crear y seleccionar
                     </button>
                   </div>
                 )}
@@ -608,15 +740,20 @@ export function AppointmentsAdmin() {
               {/* Treatment */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tratamiento</label>
-                <select
-                  value={editing.treatment_id}
-                  onChange={(e) => onTreatmentChange(Number(e.target.value) || '')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                >
+                <select value={editing.treatment_id} onChange={(e) => onTreatmentChange(Number(e.target.value) || '')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
                   <option value="">Sin tratamiento</option>
-                  {treatments.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
+                  {treatments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+
+              {/* Doctor */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Médico</label>
+                <select value={editing.doctor_id} onChange={(e) => setEditing({ ...editing, doctor_id: Number(e.target.value) || '' })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                  <option value="">Sin médico asignado</option>
+                  {doctors.map((d) => <option key={d.id} value={d.id}>{d.first_name || d.last_name ? `${d.first_name} ${d.last_name}`.trim() : d.email}</option>)}
                 </select>
               </div>
 
@@ -624,21 +761,13 @@ export function AppointmentsAdmin() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
-                    value={editing.date}
-                    onChange={(e) => setEditing({ ...editing, date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                  />
+                  <input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Hora <span className="text-red-500">*</span></label>
-                  <input
-                    type="time"
-                    value={editing.time}
-                    onChange={(e) => setEditing({ ...editing, time: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                  />
+                  <input type="time" value={editing.time} onChange={(e) => setEditing({ ...editing, time: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white" />
                 </div>
               </div>
 
@@ -646,25 +775,15 @@ export function AppointmentsAdmin() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Duración (min)</label>
-                  <input
-                    type="number"
-                    min={5}
-                    step={5}
-                    value={editing.duration_minutes}
+                  <input type="number" min={5} step={5} value={editing.duration_minutes}
                     onChange={(e) => setEditing({ ...editing, duration_minutes: Number(e.target.value) || 60 })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                  <select
-                    value={editing.status}
-                    onChange={(e) => setEditing({ ...editing, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
+                  <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
+                    {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -672,29 +791,15 @@ export function AppointmentsAdmin() {
               {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-                <textarea
-                  value={editing.notes}
-                  onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
-                  rows={3}
+                <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={3}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                  placeholder="Observaciones opcionales…"
-                />
+                  placeholder="Observaciones opcionales…" />
               </div>
             </div>
-
-            {/* Modal footer */}
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => setEditing(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
+              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+              <button onClick={handleSave} disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {editing.id ? 'Guardar cambios' : 'Crear cita'}
               </button>
@@ -702,12 +807,6 @@ export function AppointmentsAdmin() {
           </div>
         </div>
       )}
-
-      <AtenderModal
-        appointmentId={atenderApptId}
-        onClose={() => setAtenderApptId(null)}
-        onDone={() => { load(); loadHistorial(); }}
-      />
     </div>
   );
 }
