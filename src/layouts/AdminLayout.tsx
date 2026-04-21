@@ -19,8 +19,8 @@ import {
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
   { to: '/admin/calendar', icon: CalendarRange, label: 'Calendario', end: false },
+  { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
   { to: '/admin/revenue', icon: TrendingUp, label: 'Ingresos', end: false },
   { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
 import { AtenderModal } from '../../components/AtenderModal';
-import { CalendarDays, Users, Scissors, TrendingUp, Loader2, Clock, Stethoscope } from 'lucide-react';
+import { CalendarDays, Users, Scissors, TrendingUp, Loader2, Clock, Stethoscope, Eye, DollarSign, ClipboardList } from 'lucide-react';
 
 type Stats = {
   appointments_today: number;
@@ -48,18 +48,23 @@ function AppointmentList({ appts, emptyMsg, onAtender }: {
       <p className="text-gray-400 text-sm">{emptyMsg}</p>
     </div>
   );
+  const StatusIcon = ({ status }: { status: string }) => {
+    if (status === 'SCHEDULED') return <DollarSign className="w-4 h-4 text-blue-400 shrink-0" />;
+    if (status === 'CONFIRMED') return <ClipboardList className="w-4 h-4 text-green-500 shrink-0" />;
+    if (status === 'IN_PROGRESS') return <Stethoscope className="w-4 h-4 text-indigo-400 shrink-0" />;
+    return <Eye className="w-4 h-4 text-gray-400 shrink-0" />;
+  };
+
   return (
     <div className="divide-y divide-gray-50">
       {appts.map((a) => {
         const st = STATUS_LABELS[a.status] ?? { label: a.status, color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' };
         const d = new Date(a.starts_at);
-        const canAtender = ['SCHEDULED', 'CONFIRMED'].includes(a.status);
         return (
           <div
             key={a.id}
-            onClick={() => canAtender && onAtender(a.id)}
-            className={`px-6 py-4 flex items-center gap-4 transition-colors
-              ${canAtender ? 'cursor-pointer hover:bg-emerald-50/40 hover:ring-1 hover:ring-inset hover:ring-emerald-100' : 'hover:bg-gray-50/50'}`}
+            onClick={() => onAtender(a.id)}
+            className="px-6 py-4 flex items-center gap-4 transition-colors cursor-pointer hover:bg-gray-50/60"
           >
             <div className="w-12 text-center shrink-0">
               <p className="text-xs text-gray-400 capitalize">{DAY_NAMES[d.getDay()]}</p>
@@ -76,9 +81,7 @@ function AppointmentList({ appts, emptyMsg, onAtender }: {
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${st.color}`}>
               {st.label}
             </span>
-            {canAtender && (
-              <Stethoscope className="w-4 h-4 text-emerald-400 shrink-0" />
-            )}
+            <StatusIcon status={a.status} />
           </div>
         );
       })}
