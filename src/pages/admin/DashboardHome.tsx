@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
 import { AtenderModal } from '../../components/AtenderModal';
+import { NewAppointmentModal } from '../../components/NewAppointmentModal';
 import {
   CalendarDays, Users, Scissors, TrendingUp, Loader2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -283,8 +284,9 @@ export function DashboardHome() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<number | ''>('');
 
-  // Modal
+  // Modals
   const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
+  const [showNewAppt, setShowNewAppt] = useState(false);
 
   // Load stats
   useEffect(() => {
@@ -380,13 +382,22 @@ export function DashboardHome() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">
-          {isDoctor ? 'Mi Agenda' : 'Agenda'}
-        </h1>
-        <p className="text-gray-500 mt-0.5 text-sm">
-          {isDoctor ? 'Tu agenda personal' : 'Vista general de la clínica'}
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {isDoctor ? 'Mi Agenda' : 'Agenda'}
+          </h1>
+          <p className="text-gray-500 mt-0.5 text-sm">
+            {isDoctor ? 'Tu agenda personal' : 'Vista general de la clínica'}
+          </p>
+        </div>
+        {!isDoctor && (
+          <button
+            onClick={() => setShowNewAppt(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus className="w-4 h-4" /> Agendar Cita
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -478,6 +489,13 @@ export function DashboardHome() {
         onClose={() => setAtenderApptId(null)}
         onDone={handleDone}
       />
+
+      {showNewAppt && (
+        <NewAppointmentModal
+          onClose={() => setShowNewAppt(false)}
+          onCreated={handleDone}
+        />
+      )}
     </div>
   );
 }

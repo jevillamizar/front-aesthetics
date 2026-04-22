@@ -9,6 +9,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminLayout } from './layouts/AdminLayout';
 import { DashboardHome } from './pages/admin/DashboardHome';
 import { AppointmentsAdmin } from './pages/admin/AppointmentsAdmin';
+import { AppointmentComplete } from './pages/admin/AppointmentComplete';
 import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
 import { DoctorProfile } from './pages/admin/DoctorProfile';
 import { ConsentsAdmin } from './pages/admin/ConsentsAdmin';
@@ -42,6 +43,7 @@ createRoot(document.getElementById('root')!).render(
             <Route index element={<DashboardHome />} />
             <Route path="treatments" element={<TreatmentsAdmin />} />
             <Route path="appointments" element={<AppointmentsAdmin />} />
+            <Route path="appointments/:id/complete" element={<AppointmentComplete />} />
             <Route path="calendar" element={<Navigate to="/admin" replace />} />
             <Route path="revenue" element={<RevenueAdmin />} />
             <Route path="doctors" element={<DoctorsAdmin />} />

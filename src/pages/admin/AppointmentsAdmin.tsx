@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import {
-  CalendarDays, CheckCircle2, ChevronDown, ChevronUp, ClipboardList,
-  Clock, CreditCard, FileSignature, Loader2, Pencil, Play, Plus,
-  Save, Trash2, UserPlus, X,
+  Ban, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, ChevronUp,
+  ClipboardList, Clock, CreditCard, FileSignature, Loader2, Pencil, Play,
+  Plus, Save, Stethoscope, Trash2, UserPlus, UserX, X,
 } from 'lucide-react';
+import { useAuth } from '../../lib/auth';
 
 type Patient   = { id: number; first_name: string; last_name: string; email: string; phone: string };
 type Treatment = { id: number; name: string; duration_minutes: number; price?: number };
@@ -84,11 +85,12 @@ const empty: FormData = {
 
 const STATUS_OPTIONS = [
   { value: 'PENDING',     label: 'Pendiente',  color: 'bg-amber-50 text-amber-700',   dot: 'bg-amber-400' },
-  { value: 'SCHEDULED',  label: 'Programada', color: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-400' },
-  { value: 'IN_PROGRESS',label: 'En curso',   color: 'bg-violet-50 text-violet-700', dot: 'bg-violet-400' },
-  { value: 'COMPLETED',  label: 'Completada', color: 'bg-green-50 text-green-700',   dot: 'bg-green-400' },
-  { value: 'CANCELED',   label: 'Cancelada',  color: 'bg-red-50 text-red-600',       dot: 'bg-red-400' },
-  { value: 'NO_SHOW',    label: 'No asistió', color: 'bg-gray-100 text-gray-500',    dot: 'bg-gray-400' },
+  { value: 'SCHEDULED',   label: 'Programada', color: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-400' },
+  { value: 'CONFIRMED',   label: 'Confirmada', color: 'bg-green-50 text-green-700',   dot: 'bg-green-500' },
+  { value: 'IN_PROGRESS', label: 'En curso',   color: 'bg-violet-50 text-violet-700', dot: 'bg-violet-400' },
+  { value: 'COMPLETED',   label: 'Completada', color: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-400' },
+  { value: 'CANCELED',    label: 'Cancelada',  color: 'bg-red-50 text-red-600',       dot: 'bg-red-400' },
+  { value: 'NO_SHOW',     label: 'No asistió', color: 'bg-gray-100 text-gray-500',    dot: 'bg-gray-400' },
 ];
 
 const PAYMENT_STATUS = {
@@ -131,6 +133,9 @@ function toInputTime(iso: string) {
 
 export function AppointmentsAdmin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients]         = useState<Patient[]>([]);
   const [treatments, setTreatments]     = useState<Treatment[]>([]);
@@ -153,6 +158,18 @@ export function AppointmentsAdmin() {
   const [paymentForm, setPaymentForm]   = useState<Record<number, { amount: string; method: string; status: string; notes: string }>>({});
   const [savingPay, setSavingPay]       = useState<number | null>(null);
   const [transiting, setTransiting]     = useState<number | null>(null);
+
+  const [consentApptId, setConsentApptId]   = useState<number | null>(null);
+  const [consentName, setConsentName]       = useState('');
+  const [consentDesc, setConsentDesc]       = useState('');
+  const [savingConsent, setSavingConsent]   = useState(false);
+  const [consentError, setConsentError]     = useState('');
+
+  // Auto-open new form when navigated with ?new=1
+  useEffect(() => {
+    if (searchParams.get('new') === '1') openNew();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [historial, setHistorial]             = useState<Appointment[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
@@ -314,6 +331,33 @@ export function AppointmentsAdmin() {
     }));
   };
 
+  const openConsentModal = (a: Appointment) => {
+    setConsentApptId(a.id);
+    setConsentName(a.patient_name);
+    setConsentDesc(a.treatment_name ?? '');
+    setConsentError('');
+  };
+
+  const handleSaveConsent = async () => {
+    if (!consentApptId) return;
+    if (!consentName.trim()) { setConsentError('El nombre del firmante es obligatorio.'); return; }
+    setSavingConsent(true); setConsentError('');
+    try {
+      const res = await apiFetch(`/api/appointments/${consentApptId}/consent/`, {
+        method: 'POST',
+        body: JSON.stringify({ signed_by_name: consentName, procedure_description: consentDesc }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Error al registrar consentimiento');
+      const data = await res.json();
+      setAppointments((prev) =>
+        prev.map((a) => a.id === consentApptId ? { ...a, consent: data.consent } : a)
+      );
+      setConsentApptId(null);
+    } catch (e: unknown) {
+      setConsentError(e instanceof Error ? e.message : 'Error');
+    } finally { setSavingConsent(false); }
+  };
+
   const handleCreatePatient = async () => {
     if (!newPatient.first_name.trim() || !newPatient.last_name.trim()) {
       setNewPatientError('Nombres y apellidos son obligatorios.');
@@ -346,11 +390,7 @@ export function AppointmentsAdmin() {
     return m ? { label: m.label, cls: m.color } : { label: p.status, cls: 'bg-gray-100 text-gray-500' };
   };
 
-  const ACTION = {
-    PENDING:     { label: 'Confirmar', next: 'SCHEDULED',   cls: 'bg-blue-600 hover:bg-blue-700' },
-    SCHEDULED:   { label: 'Iniciar',   next: 'IN_PROGRESS', cls: 'bg-violet-600 hover:bg-violet-700' },
-    IN_PROGRESS: { label: 'Finalizar', next: 'COMPLETED',   cls: 'bg-green-600 hover:bg-green-700' },
-  } as const;
+  const isPast = (iso: string) => new Date(iso).getTime() < Date.now();
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -408,7 +448,7 @@ export function AppointmentsAdmin() {
               const pf    = paymentForm[a.id];
               const isSavingPay = savingPay === a.id;
               const isTransiting = transiting === a.id;
-              const action = ACTION[a.status as keyof typeof ACTION];
+              const pastDue = isPast(a.ends_at);
 
               return (
                 <div key={a.id}>
@@ -552,10 +592,16 @@ export function AppointmentsAdmin() {
                         </div>
 
                         {/* Consent panel */}
-                        <div className={`rounded-xl border px-3 py-3 ${a.consent ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
-                          <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
-                            <FileSignature className="w-3.5 h-3.5" /> Consentimiento
-                          </p>
+                        <div className={`rounded-xl border px-3 py-3 ${a.consent?.signed ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                              <FileSignature className="w-3.5 h-3.5" /> Consentimiento
+                            </p>
+                            {!a.consent?.signed && !['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
+                              <button onClick={(e) => { e.stopPropagation(); openConsentModal(a); }}
+                                className="text-xs text-indigo-600 hover:underline font-medium">Firmar</button>
+                            )}
+                          </div>
                           {a.consent ? (
                             <>
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
@@ -572,9 +618,17 @@ export function AppointmentsAdmin() {
 
                         {/* Historia clínica panel */}
                         <div className={`rounded-xl border px-3 py-3 ${a.medical_record_id ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100'}`}>
-                          <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-2">
-                            <ClipboardList className="w-3.5 h-3.5" /> Historia Clínica
-                          </p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                              <ClipboardList className="w-3.5 h-3.5" /> Historia Clínica
+                            </p>
+                            {['CONFIRMED', 'IN_PROGRESS'].includes(a.status) && (
+                              <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/appointments/${a.id}/complete`); }}
+                                className="text-xs text-indigo-600 hover:underline font-medium">
+                                {a.medical_record_id ? 'Editar HC' : 'Crear HC'}
+                              </button>
+                            )}
+                          </div>
                           {a.medical_record_id ? (
                             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">HC #{a.medical_record_id}</span>
                           ) : (
@@ -585,28 +639,122 @@ export function AppointmentsAdmin() {
                         </div>
                       </div>
 
-                      {/* Status action buttons */}
-                      <div className="flex items-center gap-3 pt-1">
-                        {action && (
-                          <button
-                            onClick={() => handleTransition(a.id, action.next)}
-                            disabled={isTransiting}
-                            className={`flex items-center gap-2 px-4 py-2 ${action.cls} text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors`}
-                          >
-                            {isTransiting
-                              ? <Loader2 className="w-4 h-4 animate-spin" />
-                              : <Play className="w-4 h-4" />}
-                            {action.label}
+                      {/* ── Status action buttons ── */}
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
+
+                        {/* PENDING → SCHEDULED */}
+                        {a.status === 'PENDING' && (
+                          <button onClick={() => handleTransition(a.id, 'SCHEDULED')} disabled={isTransiting}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors">
+                            {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Programar
                           </button>
                         )}
+
+                        {/* SCHEDULED → CONFIRMED (requires payment + consent + doctor) */}
+                        {a.status === 'SCHEDULED' && (() => {
+                          const hasPay = a.payment && ['PAID', 'PARTIAL'].includes(a.payment.status);
+                          const hasCon = a.consent?.signed;
+                          const hasDoc = !!a.doctor_id;
+                          const canConfirm = hasPay && hasCon && hasDoc;
+                          return (
+                            <>
+                              {!hasPay && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta pago</span>}
+                              {!hasCon && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta consentimiento</span>}
+                              {!hasDoc && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta médico</span>}
+                              <button onClick={() => handleTransition(a.id, 'CONFIRMED')} disabled={isTransiting || !canConfirm}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
+                                title={!canConfirm ? 'Registre pago, consentimiento y médico primero' : ''}>
+                                {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Confirmar
+                              </button>
+                            </>
+                          );
+                        })()}
+
+                        {/* CONFIRMED → IN_PROGRESS (only within time window) */}
+                        {a.status === 'CONFIRMED' && (() => {
+                          const now = Date.now();
+                          const windowStart = new Date(a.starts_at).getTime() - 15 * 60 * 1000;
+                          const windowEnd = new Date(a.ends_at).getTime();
+                          const inWindow = now >= windowStart && now <= windowEnd;
+                          const tooEarly = now < windowStart;
+                          const minsLeft = tooEarly ? Math.ceil((windowStart - now) / 60000) : 0;
+                          return (
+                            <>
+                              {tooEarly && (
+                                <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                                  Disponible en {minsLeft} min
+                                </span>
+                              )}
+                              {!tooEarly && !inWindow && (
+                                <span className="text-xs text-red-600 bg-red-50 px-2.5 py-1 rounded-full">
+                                  Ventana expirada
+                                </span>
+                              )}
+                              <button onClick={() => handleTransition(a.id, 'IN_PROGRESS')} disabled={isTransiting || !inWindow}
+                                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
+                                title={!inWindow ? (tooEarly ? `Puede iniciar desde 15 min antes (faltan ${minsLeft} min)` : 'Ventana expirada') : ''}>
+                                {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Iniciar Procedimiento
+                              </button>
+                            </>
+                          );
+                        })()}
+
+                        {/* IN_PROGRESS → redirect to complete page */}
+                        {a.status === 'IN_PROGRESS' && (
+                          <button onClick={() => navigate(`/admin/appointments/${a.id}/complete`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors">
+                            <ClipboardList className="w-4 h-4" /> Finalizar — Completar HC
+                          </button>
+                        )}
+
+                        {/* COMPLETED → view patient profile */}
                         {a.status === 'COMPLETED' && (
-                          <button
-                            onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
-                          >
+                          <button onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
                             <CheckCircle2 className="w-4 h-4" /> Ver historial
                           </button>
                         )}
+
+                        {/* NO_SHOW from SCHEDULED (past due) or CONFIRMED */}
+                        {((a.status === 'SCHEDULED' && pastDue) || a.status === 'CONFIRMED') && (
+                          <button onClick={() => {
+                            if (confirm('¿Marcar como no asistió?' + (a.status === 'CONFIRMED' ? ' Podrá reagendar después.' : ''))) {
+                              handleTransition(a.id, 'NO_SHOW');
+                            }
+                          }} disabled={isTransiting}
+                            className="flex items-center gap-2 px-3 py-2 text-amber-700 border border-amber-200 bg-amber-50 text-sm font-medium rounded-xl hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                            <UserX className="w-4 h-4" /> No asistió
+                          </button>
+                        )}
+
+                        {/* Reschedule option for NO_SHOW */}
+                        {a.status === 'NO_SHOW' && (
+                          <button onClick={() => {
+                            setEditing({
+                              patient_id: a.patient_id,
+                              treatment_id: a.treatment_id ?? '',
+                              doctor_id: a.doctor_id ?? '',
+                              date: '', time: '',
+                              duration_minutes: Math.round((new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 60000),
+                              status: 'PENDING',
+                              notes: `Reagendada (original: ${toLocal(a.starts_at).date})`,
+                            });
+                          }}
+                            className="flex items-center gap-2 px-3 py-2 text-blue-700 border border-blue-200 bg-blue-50 text-sm font-medium rounded-xl hover:bg-blue-100 transition-colors">
+                            <CalendarPlus className="w-4 h-4" /> Reagendar
+                          </button>
+                        )}
+
+                        {/* CANCEL — admin only, before COMPLETED */}
+                        {isAdmin && !['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
+                          <button onClick={() => {
+                            if (confirm('¿Cancelar esta cita?')) handleTransition(a.id, 'CANCELED');
+                          }} disabled={isTransiting}
+                            className="flex items-center gap-2 px-3 py-2 text-red-600 border border-red-200 bg-red-50 text-sm font-medium rounded-xl hover:bg-red-100 disabled:opacity-50 transition-colors">
+                            <Ban className="w-4 h-4" /> Cancelar
+                          </button>
+                        )}
+
                         <span className={`ml-auto text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
                       </div>
                     </div>
@@ -802,6 +950,50 @@ export function AppointmentsAdmin() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {editing.id ? 'Guardar cambios' : 'Crear cita'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consent signing modal */}
+      {consentApptId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConsentApptId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileSignature className="w-5 h-5 text-indigo-600" /> Firmar Consentimiento
+              </h2>
+              <button onClick={() => setConsentApptId(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {consentError && (
+                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{consentError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del firmante <span className="text-red-500">*</span></label>
+                <input type="text" value={consentName} onChange={(e) => setConsentName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Procedimiento</label>
+                <input type="text" value={consentDesc} onChange={(e) => setConsentDesc(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="Descripción del procedimiento" />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setConsentApptId(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleSaveConsent} disabled={savingConsent}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {savingConsent ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSignature className="w-4 h-4" />}
+                Firmar Consentimiento
               </button>
             </div>
           </div>

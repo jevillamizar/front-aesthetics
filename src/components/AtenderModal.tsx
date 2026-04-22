@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 import {
   Calendar, Clock, Loader2, Phone, Mail, User, X,
-  CheckCircle, DollarSign, FileSignature, ClipboardList, Ban, Stethoscope, AlertTriangle,
+  CheckCircle, DollarSign, FileSignature, Ban, Stethoscope, AlertTriangle, UserX, ClipboardList,
 } from 'lucide-react';
 
 /* ── Types ──────────────────────────────────────────────────────── */
@@ -360,92 +361,39 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
 }
 
 /* ================================================================
-   CONFIRMED / IN_PROGRESS → COMPLETED  (Historia Clínica)
+   CONFIRMED → IN_PROGRESS  (Iniciar procedimiento)
    ================================================================ */
 
-const MR_FIELDS: { key: string; label: string; rows?: number; required?: boolean }[] = [
-  { key: 'chief_complaint',         label: 'Motivo de consulta' },
-  { key: 'current_illness',         label: 'Enfermedad actual',            rows: 2 },
-  { key: 'personal_history',        label: 'Antecedentes personales',      rows: 2 },
-  { key: 'surgical_history',        label: 'Antecedentes quirúrgicos' },
-  { key: 'allergic_history',        label: 'Antecedentes alérgicos' },
-  { key: 'pharmacological_history', label: 'Antecedentes farmacológicos' },
-  { key: 'family_history',          label: 'Antecedentes familiares' },
-  { key: 'physical_exam',           label: 'Examen físico',               rows: 3 },
-  { key: 'diagnosis',               label: 'Diagnóstico *',               rows: 2, required: true },
-  { key: 'treatment_plan',          label: 'Plan de tratamiento',         rows: 2 },
-  { key: 'evolution',               label: 'Evolución',                   rows: 2 },
-  { key: 'notes',                   label: 'Notas adicionales' },
-];
-
-type MRForm = Record<string, string>;
-
-function MedicalRecordPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () => void; onClose: () => void }) {
-  const blank: MRForm = Object.fromEntries(MR_FIELDS.map(f => [f.key, '']));
-  const [form, setForm] = useState<MRForm>(blank);
-  const [saving, setSaving] = useState(false);
+function ConfirmedPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () => void; onClose: () => void }) {
+  const [transitioning, setTransitioning] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [noShowing, setNoShowing] = useState(false);
   const [error, setError] = useState('');
-  const [loadingRec, setLoadingRec] = useState(false);
 
-  useEffect(() => {
-    if (!appt.medical_record_id) return;
-    setLoadingRec(true);
-    apiFetch(`/api/medical-records/${appt.medical_record_id}/`)
-      .then(r => r.json())
-      .then(d => {
-        const rec = d.record;
-        if (rec) setForm(prev => {
-          const next = { ...prev };
-          for (const f of MR_FIELDS) next[f.key] = rec[f.key] || '';
-          return next;
-        });
-      })
-      .finally(() => setLoadingRec(false));
-  }, [appt.medical_record_id]);
-
-  const set = (key: string) => (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-    setForm(prev => ({ ...prev, [key]: e.target.value }));
-
-  const handleSaveAndComplete = async () => {
-    if (!form.diagnosis.trim()) {
-      setError('El diagnóstico es obligatorio para completar la cita.');
-      return;
-    }
-    setSaving(true); setError('');
+  const handleStart = async () => {
+    setTransitioning(true); setError('');
     try {
-      let mrId = appt.medical_record_id;
-
-      if (appt.status === 'CONFIRMED') {
-        const r = await apiFetch(`/api/appointments/${appt.id}/`, {
-          method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
-        });
-        const rData = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(rData.detail || 'Error al iniciar consulta');
-        mrId = rData.appointment?.medical_record_id ?? mrId;
-      }
-
-      if (!mrId) {
-        const freshRes = await apiFetch(`/api/appointments/${appt.id}/`);
-        const freshData = await freshRes.json();
-        mrId = freshData.appointment?.medical_record_id;
-      }
-      if (!mrId) throw new Error('No se pudo obtener la historia clínica.');
-
-      const mr = await apiFetch(`/api/medical-records/${mrId}/`, {
-        method: 'PUT', body: JSON.stringify(form),
+      const r = await apiFetch(`/api/appointments/${appt.id}/`, {
+        method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
       });
-      if (!mr.ok) throw new Error((await mr.json().catch(() => ({}))).detail || 'Error al guardar historia clínica');
-
-      const c = await apiFetch(`/api/appointments/${appt.id}/`, {
-        method: 'PATCH', body: JSON.stringify({ status: 'COMPLETED' }),
-      });
-      if (!c.ok) throw new Error((await c.json().catch(() => ({}))).detail || 'Error al completar cita');
-
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al iniciar procedimiento');
       onDone(); onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error');
-    } finally { setSaving(false); }
+    } finally { setTransitioning(false); }
+  };
+
+  const handleNoShow = async () => {
+    setNoShowing(true); setError('');
+    try {
+      const r = await apiFetch(`/api/appointments/${appt.id}/`, {
+        method: 'PATCH', body: JSON.stringify({ status: 'NO_SHOW' }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error');
+      onDone(); onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally { setNoShowing(false); }
   };
 
   const handleCancel = async () => {
@@ -461,48 +409,108 @@ function MedicalRecordPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDon
     } finally { setCanceling(false); }
   };
 
-  if (loadingRec) {
-    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
-  }
+  const busy = transitioning || canceling || noShowing;
+
+  // Time window: 15 min before starts_at until ends_at
+  const now = Date.now();
+  const windowStart = new Date(appt.starts_at).getTime() - 15 * 60 * 1000;
+  const windowEnd = new Date(appt.ends_at).getTime();
+  const inWindow = now >= windowStart && now <= windowEnd;
+  const tooEarly = now < windowStart;
+  const minsLeft = tooEarly ? Math.ceil((windowStart - now) / 60000) : 0;
 
   return (
     <>
-      <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+      <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
         <ApptInfo appt={appt} />
 
-        <div className="border-t border-gray-100 pt-4">
-          <div className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
-            <ClipboardList className="w-4 h-4 text-indigo-600" /> Historia Clínica
-          </div>
-          <div className="space-y-3">
-            {MR_FIELDS.map(f => (
-              <div key={f.key} className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-500">{f.label}</label>
-                <textarea value={form[f.key]} onChange={set(f.key)} rows={f.rows ?? 1}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none
-                    ${f.required && !form[f.key].trim() ? 'border-red-300' : 'border-gray-200'}`} />
-              </div>
-            ))}
+        {/* Info: ready to start */}
+        <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-green-800">Cita confirmada — lista para iniciar</p>
+            <p className="text-xs text-green-600 mt-1">
+              Pago registrado · Consentimiento firmado · Médico: {appt.doctor_name ?? '—'}
+            </p>
           </div>
         </div>
+
+        {/* Time window info */}
+        {tooEarly && (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+            <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <p className="text-sm text-gray-600">
+              Puede iniciar el procedimiento en <span className="font-semibold">{minsLeft} min</span> (15 min antes de la cita)
+            </p>
+          </div>
+        )}
+        {!tooEarly && !inWindow && (
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-600">La ventana para iniciar esta cita ya expiró. Marque como No Asistió o cancele.</p>
+          </div>
+        )}
 
         {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
       </div>
 
       <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2 sm:flex-row sm:justify-between">
-        <button onClick={handleCancel} disabled={canceling || saving}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-red-600 border border-red-200 bg-red-50 text-sm font-medium rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors">
-          {canceling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />} Cancelar Cita
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleCancel} disabled={busy}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-red-600 border border-red-200 bg-red-50 text-sm font-medium rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors">
+            {canceling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />} Cancelar
+          </button>
+          <button onClick={handleNoShow} disabled={busy}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-amber-700 border border-amber-200 bg-amber-50 text-sm font-medium rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors">
+            {noShowing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />} No asistió
+          </button>
+        </div>
         <div className="flex gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
             Cerrar
           </button>
-          <button onClick={handleSaveAndComplete} disabled={saving || canceling}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Guardar y Completar
+          <button onClick={handleStart} disabled={busy || !inWindow}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            title={!inWindow ? (tooEarly ? `Disponible en ${minsLeft} min` : 'Ventana expirada') : ''}>
+            {transitioning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Iniciar Procedimiento
           </button>
         </div>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================
+   IN_PROGRESS → redirect to complete page
+   ================================================================ */
+
+function InProgressPanel({ appt, onClose }: { appt: ApptDetail; onClose: () => void }) {
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+        <ApptInfo appt={appt} />
+
+        <div className="flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <Stethoscope className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-indigo-800">Procedimiento en curso</p>
+            <p className="text-xs text-indigo-600 mt-1">
+              Para completar la cita, debe llenar la historia clínica en la página completa.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-4 border-t border-gray-100 flex justify-between">
+        <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+          Cerrar
+        </button>
+        <button onClick={() => { onClose(); navigate(`/admin/appointments/${appt.id}/complete`); }}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+          <ClipboardList className="w-4 h-4" /> Completar Historia Clínica
+        </button>
       </div>
     </>
   );
@@ -581,7 +589,8 @@ export function AtenderModal({ appointmentId, onClose, onDone }: Props) {
 
   const title =
     appt?.status === 'SCHEDULED'   ? 'Confirmar Cita' :
-    appt?.status === 'CONFIRMED' || appt?.status === 'IN_PROGRESS' ? 'Atender Cita' :
+    appt?.status === 'CONFIRMED'   ? 'Iniciar Procedimiento' :
+    appt?.status === 'IN_PROGRESS' ? 'Procedimiento en Curso' :
     'Detalle de Cita';
 
   return (
@@ -602,8 +611,10 @@ export function AtenderModal({ appointmentId, onClose, onDone }: Props) {
           <div className="px-6 py-8 text-center text-red-500 text-sm">{error}</div>
         ) : appt?.status === 'SCHEDULED' ? (
           <ConfirmPanel appt={appt} onDone={onDone} onClose={onClose} />
-        ) : appt?.status === 'CONFIRMED' || appt?.status === 'IN_PROGRESS' ? (
-          <MedicalRecordPanel appt={appt} onDone={onDone} onClose={onClose} />
+        ) : appt?.status === 'CONFIRMED' ? (
+          <ConfirmedPanel appt={appt} onDone={onDone} onClose={onClose} />
+        ) : appt?.status === 'IN_PROGRESS' ? (
+          <InProgressPanel appt={appt} onClose={onClose} />
         ) : appt ? (
           <ReadOnlyPanel appt={appt} onClose={onClose} />
         ) : null}
