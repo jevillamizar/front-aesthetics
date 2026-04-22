@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import {
@@ -16,6 +16,8 @@ import {
   ChevronDown,
   Settings as SettingsIcon,
   Bell,
+  UserCircle,
+  Building2,
 } from 'lucide-react';
 
 const topItems = [
@@ -36,6 +38,18 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -190,17 +204,46 @@ export function AdminLayout() {
               <Bell className="w-5 h-5" />
             </button>
 
-            {/* User pill */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-gray-100">
-              <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {user?.first_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'}
-              </div>
-              <div className="hidden sm:block min-w-0">
-                <p className="text-sm font-medium text-gray-900 leading-tight truncate max-w-[140px]">
-                  {user?.first_name ? `${user.first_name} ${user.last_name}`.trim() : user?.email}
-                </p>
-                <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role?.toLowerCase()}</p>
-              </div>
+            {/* User pill + dropdown */}
+            <div className="relative pl-2 border-l border-gray-100" ref={userMenuRef}>
+              <button
+                onClick={() => setUserMenuOpen(v => !v)}
+                className="flex items-center gap-2.5 hover:bg-gray-50 rounded-xl px-2 py-1.5 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {user?.first_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'}
+                </div>
+                <div className="hidden sm:block min-w-0 text-left">
+                  <p className="text-sm font-medium text-gray-900 leading-tight truncate max-w-[140px]">
+                    {user?.first_name ? `${user.first_name} ${user.last_name}`.trim() : user?.email}
+                  </p>
+                  <p className="text-xs text-gray-400 capitalize leading-tight">{user?.role?.toLowerCase()}</p>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform hidden sm:block ${userMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                  <button
+                    onClick={() => { setUserMenuOpen(false); navigate('/admin/settings?tab=account'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                    <UserCircle className="w-4 h-4 text-gray-400" /> Mi Cuenta
+                  </button>
+                  {user?.role === 'ADMIN' && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); navigate('/admin/settings?tab=clinic'); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                      <Building2 className="w-4 h-4 text-gray-400" /> Datos de la Clínica
+                    </button>
+                  )}
+                  <hr className="my-1 border-gray-100" />
+                  <button
+                    onClick={() => { setUserMenuOpen(false); handleLogout(); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                    <LogOut className="w-4 h-4" /> Cerrar sesión
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

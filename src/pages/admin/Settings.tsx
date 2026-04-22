@@ -1,19 +1,29 @@
-import { useState } from 'react';
-import { Palette, Building2, Bell, Scissors } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Palette, Building2, Bell, Scissors, UserCircle } from 'lucide-react';
 import { LandingEditor } from './LandingEditor';
 import { TreatmentsAdmin } from './TreatmentsAdmin';
+import { AccountSettings } from './AccountSettings';
+import { ClinicSettings } from './ClinicSettings';
 
-type Tab = 'landing' | 'clinic' | 'notifications' | 'treatments';
+type Tab = 'account' | 'clinic' | 'landing' | 'treatments' | 'notifications';
 
 const tabs: { id: Tab; label: string; icon: typeof Palette }[] = [
+  { id: 'account', label: 'Mi Cuenta', icon: UserCircle },
+  { id: 'clinic', label: 'Datos de la Clínica', icon: Building2 },
   { id: 'landing', label: 'Landing Page', icon: Palette },
   { id: 'treatments', label: 'Tratamientos', icon: Scissors },
-  { id: 'clinic', label: 'Datos de la Clínica', icon: Building2 },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
 ];
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<Tab>('landing');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<Tab>((searchParams.get('tab') as Tab) ?? 'account');
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as Tab | null;
+    if (t && tabs.some(tab => tab.id === t)) setActiveTab(t);
+  }, [searchParams]);
 
   return (
     <div>
@@ -44,21 +54,11 @@ export function Settings() {
 
       {/* Tab content */}
       <div>
-        {activeTab === 'landing' && <LandingEditor />}
-      {activeTab === 'treatments' && <TreatmentsAdmin />}
+        {activeTab === 'account' && <AccountSettings />}
         {activeTab === 'clinic' && <ClinicSettings />}
+        {activeTab === 'landing' && <LandingEditor />}
+        {activeTab === 'treatments' && <TreatmentsAdmin />}
         {activeTab === 'notifications' && <NotificationSettings />}
-      </div>
-    </div>
-  );
-}
-
-function ClinicSettings() {
-  return (
-    <div className="max-w-2xl">
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Información de la Clínica</h2>
-        <p className="text-gray-500 text-sm">Módulo en construcción…</p>
       </div>
     </div>
   );
