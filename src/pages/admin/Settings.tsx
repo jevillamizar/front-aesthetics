@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Palette, Building2, Bell } from 'lucide-react';
+import { Palette, Building2, Bell, Scissors } from 'lucide-react';
 import { LandingEditor } from './LandingEditor';
+import { TreatmentsAdmin } from './TreatmentsAdmin';
 
-type Tab = 'landing' | 'clinic' | 'notifications';
+type Tab = 'landing' | 'clinic' | 'notifications' | 'treatments';
 
 const tabs: { id: Tab; label: string; icon: typeof Palette }[] = [
   { id: 'landing', label: 'Landing Page', icon: Palette },
+  { id: 'treatments', label: 'Tratamientos', icon: Scissors },
   { id: 'clinic', label: 'Datos de la Clínica', icon: Building2 },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
 ];
@@ -43,6 +45,7 @@ export function Settings() {
       {/* Tab content */}
       <div>
         {activeTab === 'landing' && <LandingEditor />}
+      {activeTab === 'treatments' && <TreatmentsAdmin />}
         {activeTab === 'clinic' && <ClinicSettings />}
         {activeTab === 'notifications' && <NotificationSettings />}
       </div>
