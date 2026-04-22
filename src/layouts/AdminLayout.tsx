@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import {
-  LayoutDashboard,
   Scissors,
   CalendarDays,
   Stethoscope,
@@ -18,16 +17,15 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/calendar', icon: CalendarRange, label: 'Calendario', end: false },
-  { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false },
-  { to: '/admin/revenue', icon: TrendingUp, label: 'Ingresos', end: false },
-  { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false },
-  { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false },
-  { to: '/admin/medical-records', icon: ClipboardList, label: 'Historial Clínico', end: false },
-  { to: '/admin/consents', icon: FileSignature, label: 'Consentimientos', end: false },
-  { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false },
-  { to: '/admin/settings', icon: Settings, label: 'Configuración', end: false },
+  { to: '/admin', icon: CalendarRange, label: 'Agenda', end: true, adminOnly: false },
+  { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false, adminOnly: false },
+  { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false, adminOnly: false },
+  { to: '/admin/medical-records', icon: ClipboardList, label: 'Historial Clínico', end: false, adminOnly: false },
+  { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false, adminOnly: true },
+  { to: '/admin/revenue', icon: TrendingUp, label: 'Ingresos', end: false, adminOnly: true },
+  { to: '/admin/treatments', icon: Scissors, label: 'Tratamientos', end: false, adminOnly: true },
+  { to: '/admin/consents', icon: FileSignature, label: 'Consentimientos', end: false, adminOnly: true },
+  { to: '/admin/settings', icon: Settings, label: 'Configuración', end: false, adminOnly: true },
 ];
 
 export function AdminLayout() {
@@ -73,7 +71,7 @@ export function AdminLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.adminOnly || user?.role === 'ADMIN').map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

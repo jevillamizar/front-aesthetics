@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import {
   Calendar, Clock, Loader2, Phone, Mail, User, X,
-  CheckCircle, DollarSign, FileSignature, ClipboardList, Ban,
+  CheckCircle, DollarSign, FileSignature, ClipboardList, Ban, Stethoscope, AlertTriangle,
 } from 'lucide-react';
 
 /* ── Types ──────────────────────────────────────────────────────── */
@@ -20,6 +20,11 @@ type ApptDetail = {
   treatment_id: number | null; treatment_name: string | null; treatment_price: number | null;
   doctor_id: number | null; doctor_name: string | null; doctor_email: string | null;
   payment: PaymentInfo | null; medical_record_id: number | null; consent: ConsentInfo | null;
+};
+type DoctorOption = { id: number; first_name: string; last_name: string; specialty: string };
+type DoctorSlot = {
+  id: number; starts_at: string; ends_at: string; status: string;
+  patient_name: string; treatment_name: string | null;
 };
 
 /* ── Constants ──────────────────────────────────────────────────── */
@@ -110,6 +115,12 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
   const [consentName, setConsentName] = useState(appt.patient_name);
   const [consentDesc, setConsentDesc] = useState(appt.treatment_name ?? '');
 
+  // Doctor assignment
+  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>(appt.doctor_id ?? '');
+  const [doctorSlots, setDoctorSlots] = useState<DoctorSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [error, setError] = useState('');
@@ -117,7 +128,40 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
   const paymentDone = appt.payment && ['PAID', 'PARTIAL'].includes(appt.payment.status);
   const consentDone = appt.consent?.signed;
 
+  // Fetch doctors list
+  useEffect(() => {
+    apiFetch('/api/doctors/')
+      .then(r => r.json())
+      .then(d => setDoctors((d.doctors || []).filter((doc: DoctorOption & { is_active?: boolean }) => doc.is_active !== false)))
+      .catch(() => {});
+  }, []);
+
+  // Fetch selected doctor's agenda for the appointment date
+  const apptDate = appt.starts_at.slice(0, 10);
+  useEffect(() => {
+    if (!selectedDoctorId) { setDoctorSlots([]); return; }
+    setLoadingSlots(true);
+    apiFetch(`/api/doctors/${selectedDoctorId}/availability/?date=${apptDate}`)
+      .then(r => r.json())
+      .then(d => setDoctorSlots(d.appointments || []))
+      .catch(() => setDoctorSlots([]))
+      .finally(() => setLoadingSlots(false));
+  }, [selectedDoctorId, apptDate]);
+
+  // Check if selected doctor has a conflict with this appointment's time slot
+  const apptStart = new Date(appt.starts_at).getTime();
+  const apptEnd = new Date(appt.ends_at).getTime();
+  const BUFFER_MS = 5 * 60 * 1000;
+  const hasConflict = doctorSlots.some(s => {
+    if (s.id === appt.id) return false;
+    const sStart = new Date(s.starts_at).getTime();
+    const sEnd = new Date(s.ends_at).getTime();
+    return sStart < apptEnd + BUFFER_MS && sEnd > apptStart - BUFFER_MS;
+  });
+
   const handleConfirm = async () => {
+    if (!selectedDoctorId) { setError('Debe seleccionar un médico.'); return; }
+    if (hasConflict) { setError('El médico tiene un conflicto de horario. Seleccione otro.'); return; }
     setSaving(true);
     setError('');
     try {
@@ -136,7 +180,7 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al registrar consentimiento');
       }
       const r = await apiFetch(`/api/appointments/${appt.id}/`, {
-        method: 'PATCH', body: JSON.stringify({ status: 'CONFIRMED' }),
+        method: 'PATCH', body: JSON.stringify({ status: 'CONFIRMED', doctor_id: selectedDoctorId }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al confirmar');
       onDone(); onClose();
@@ -162,6 +206,65 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
     <>
       <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
         <ApptInfo appt={appt} />
+
+        {/* Doctor assignment */}
+        <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 font-semibold text-gray-900">
+            <Stethoscope className="w-4 h-4 text-violet-600" /> Médico <span className="text-red-500 text-xs">*</span>
+            {appt.doctor_name && <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full ml-auto">Asignado</span>}
+          </div>
+          <select value={selectedDoctorId} onChange={e => setSelectedDoctorId(Number(e.target.value) || '')}
+            className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
+            <option value="">Seleccionar médico…</option>
+            {doctors.map(d => (
+              <option key={d.id} value={d.id}>
+                {d.first_name} {d.last_name}{d.specialty ? ` — ${d.specialty}` : ''}
+              </option>
+            ))}
+          </select>
+
+          {/* Mini-agenda del doctor */}
+          {selectedDoctorId && (
+            <div className="mt-2">
+              <p className="text-xs font-medium text-gray-500 mb-2">Agenda del {new Date(appt.starts_at).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short' })}:</p>
+              {loadingSlots ? (
+                <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-gray-300" /></div>
+              ) : doctorSlots.length === 0 ? (
+                <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">Sin citas — disponible todo el día</p>
+              ) : (
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {doctorSlots.map(s => {
+                    const sStart = new Date(s.starts_at).getTime();
+                    const sEnd = new Date(s.ends_at).getTime();
+                    const isConflict = s.id !== appt.id && sStart < apptEnd + BUFFER_MS && sEnd > apptStart - BUFFER_MS;
+                    return (
+                      <div key={s.id} className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg ${
+                        s.id === appt.id ? 'bg-blue-50 border border-blue-200 text-blue-700' :
+                        isConflict ? 'bg-red-50 border border-red-200 text-red-700' :
+                        'bg-gray-50 text-gray-600'
+                      }`}>
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        <span className="font-medium">
+                          {new Date(s.starts_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                          {' — '}
+                          {new Date(s.ends_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="truncate">{s.patient_name}</span>
+                        {isConflict && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0 ml-auto" />}
+                        {s.id === appt.id && <span className="ml-auto text-[10px] font-semibold">ESTA CITA</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {hasConflict && (
+                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Conflicto de horario detectado (incluye 5 min de buffer)
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Payment */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-3">
@@ -246,7 +349,7 @@ function ConfirmPanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () 
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
             Cerrar
           </button>
-          <button onClick={handleConfirm} disabled={saving || canceling}
+          <button onClick={handleConfirm} disabled={saving || canceling || hasConflict || !selectedDoctorId}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Confirmar Cita
           </button>

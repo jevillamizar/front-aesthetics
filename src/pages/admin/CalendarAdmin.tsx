@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { AtenderModal } from '../../components/AtenderModal';
 import {
   ChevronLeft, ChevronRight, Loader2, CalendarDays,
@@ -13,6 +14,7 @@ type Appt = {
   patient_name: string;
   treatment_name: string | null;
   doctor_id: number | null;
+  doctor_name: string | null;
   doctor_email: string | null;
 };
 
@@ -257,6 +259,8 @@ function DayView({ date, appointments, onApptClick }: {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 export function CalendarAdmin() {
+  const { user } = useAuth();
+  const isDoctor = user?.role === 'DOCTOR';
   const today = new Date();
   const [view, setView] = useState<View>('month');
   const [date, setDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -296,8 +300,12 @@ export function CalendarAdmin() {
   }, [getRange, doctorFilter]);
 
   useEffect(() => {
-    apiFetch('/api/doctors/').then((r) => r.json()).then((d) => setDoctors(d.doctors || []));
-  }, []);
+    if (isDoctor && user?.id) {
+      setDoctorFilter(user.id);
+    } else {
+      apiFetch('/api/doctors/').then((r) => r.json()).then((d) => setDoctors(d.doctors || []));
+    }
+  }, [isDoctor, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -334,12 +342,12 @@ export function CalendarAdmin() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Calendario</h1>
-          <p className="text-gray-500 mt-0.5 text-sm">Vista global de todas las citas</p>
+          <p className="text-gray-500 mt-0.5 text-sm">{isDoctor ? 'Tu agenda personal' : 'Vista global de todas las citas'}</p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Doctor filter */}
-          {doctors.length > 0 && (
+          {/* Doctor filter (hidden for DOCTOR role — auto-filtered) */}
+          {!isDoctor && doctors.length > 0 && (
             <select
               value={doctorFilter}
               onChange={(e) => setDoctorFilter(e.target.value ? Number(e.target.value) : '')}

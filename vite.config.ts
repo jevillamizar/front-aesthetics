@@ -8,7 +8,6 @@ export default defineConfig({
     allowedHosts: ['.lvh.me'],
     hmr: {
       clientPort: 5173,
-      host: 'localhost'
     }
   }
 })
