@@ -145,7 +145,8 @@ export function AppointmentsAdmin() {
   const [error, setError]               = useState('');
 
   const [statusFilter, setStatusFilter]   = useState('');
-  const [dateFilter, setDateFilter]       = useState('');
+  const [dateFrom, setDateFrom]           = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateTo, setDateTo]               = useState(() => new Date().toISOString().slice(0, 10));
   const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -186,7 +187,8 @@ export function AppointmentsAdmin() {
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
-      if (dateFilter) params.set('date', dateFilter);
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo)   params.set('to',   dateTo);
       if (patientFilter) params.set('patient_id', String(patientFilter));
       const res = await apiFetch(`/api/appointments/?${params}`);
       const json = await res.json();
@@ -194,7 +196,20 @@ export function AppointmentsAdmin() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, dateFilter, patientFilter]);
+  }, [statusFilter, dateFrom, dateTo, patientFilter]);
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  const setToday = () => { const t = today(); setDateFrom(t); setDateTo(t); };
+
+  const setWeek = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    setDateFrom(mon.toISOString().slice(0, 10));
+    setDateTo(sun.toISOString().slice(0, 10));
+  };
 
   const loadMeta = async () => {
     const [pRes, tRes, dRes] = await Promise.all([
@@ -410,21 +425,55 @@ export function AppointmentsAdmin() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Quick range buttons */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+          <button
+            onClick={setToday}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              dateFrom === today() && dateTo === today()
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            Hoy
+          </button>
+          <button
+            onClick={setWeek}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              dateFrom !== dateTo || dateFrom !== today()
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            Esta semana
+          </button>
+        </div>
+
+        {/* Date range */}
+        <div className="flex items-center gap-1.5">
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900" />
+          <span className="text-gray-400 text-sm">—</span>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900" />
+        </div>
+
+        {/* Status */}
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
           <option value="">Todos los estados</option>
           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900" />
+
+        {/* Patient */}
         <select value={patientFilter} onChange={(e) => setPatientFilter(Number(e.target.value) || '')}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
           <option value="">Todos los pacientes</option>
           {patients.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
         </select>
-        {(statusFilter || dateFilter || patientFilter) && (
-          <button onClick={() => { setStatusFilter(''); setDateFilter(''); setPatientFilter(''); }}
+
+        {/* Clear */}
+        {(statusFilter || patientFilter) && (
+          <button onClick={() => { setStatusFilter(''); setPatientFilter(''); }}
             className="px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50">Limpiar</button>
         )}
       </div>
@@ -440,6 +489,24 @@ export function AppointmentsAdmin() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
+            {/* Header row */}
+            <div className="flex items-center gap-3 px-5 py-2.5 bg-gray-50 border-b border-gray-100">
+              <div className="w-4 flex-shrink-0" />
+              <div className="w-14 flex-shrink-0">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Paciente / Servicio</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-24 text-center">Estado</span>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-16 text-center">Pago</span>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-20 text-center">Consent.</span>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide w-10 text-center">HC</span>
+                <div className="w-16 flex-shrink-0" />
+              </div>
+            </div>
+
             {appointments.map((a) => {
               const { date, time } = toLocal(a.starts_at);
               const st  = statusInfo(a.status);
@@ -471,29 +538,39 @@ export function AppointmentsAdmin() {
                       <p className="text-xs text-gray-400 truncate">{a.treatment_name ?? 'Sin servicio'}{a.doctor_name ? ` · ${a.doctor_name}` : ''}</p>
                     </div>
 
-                    {/* Badges */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${pay.cls}`}>{pay.label}</span>
-                      {a.consent ? (
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                          {a.consent.signed ? 'Firmado' : 'Sin firmar'}
+                    {/* Badges — fixed widths matching header */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="w-24 flex justify-center">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${st.color}`}>{st.label}</span>
+                      </div>
+                      <div className="w-16 flex justify-center">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${pay.cls}`}>{pay.label}</span>
+                      </div>
+                      <div className="w-20 flex justify-center">
+                        {a.consent ? (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {a.consent.signed ? 'Firmado' : 'Sin firmar'}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 text-gray-400">Sin consent.</span>
+                        )}
+                      </div>
+                      <div className="w-10 flex justify-center">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${a.medical_record_id ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
+                          {a.medical_record_id ? 'HC ✓' : 'Sin HC'}
                         </span>
-                      ) : (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Sin consent.</span>
-                      )}
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.medical_record_id ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
-                        {a.medical_record_id ? 'HC ✓' : 'Sin HC'}
-                      </span>
+                      </div>
                     </div>
 
                     {/* Actions - stop propagation */}
-                    <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {!['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
+                    <div className="flex gap-1 flex-shrink-0 w-16 justify-end" onClick={(e) => e.stopPropagation()}>
+                      {!['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) ? (
                         <button onClick={() => openEdit(a)}
                           className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
                         </button>
+                      ) : (
+                        <div className="w-7 flex-shrink-0" />
                       )}
                       <button onClick={() => handleDelete(a.id)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">

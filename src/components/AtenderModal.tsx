@@ -509,7 +509,7 @@ function InProgressPanel({ appt, onClose }: { appt: ApptDetail; onClose: () => v
         </button>
         <button onClick={() => { onClose(); navigate(`/admin/appointments/${appt.id}/complete`); }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
-          <ClipboardList className="w-4 h-4" /> Completar Historia Clínica
+          <ClipboardList className="w-4 h-4" /> Completar Procedimiento
         </button>
       </div>
     </>
