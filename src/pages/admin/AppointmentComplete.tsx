@@ -28,7 +28,7 @@ const MR_FIELDS: { key: string; label: string; rows?: number; required?: boolean
   { key: 'family_history',          label: 'Antecedentes familiares' },
   { key: 'physical_exam',           label: 'Examen físico',               rows: 3 },
   { key: 'diagnosis',               label: 'Diagnóstico',                 rows: 2, required: true },
-  { key: 'treatment_plan',          label: 'Plan de tratamiento',         rows: 2 },
+  { key: 'treatment_plan',          label: 'Plan de procedimiento',       rows: 2 },
   { key: 'evolution',               label: 'Evolución',                   rows: 2 },
   { key: 'notes',                   label: 'Notas adicionales' },
 ];
@@ -264,7 +264,7 @@ export function AppointmentComplete() {
           </div>
           {appt.treatment_name && (
             <div className="text-sm text-gray-600">
-              <span className="font-medium">Tratamiento:</span> {appt.treatment_name}
+              <span className="font-medium">Procedimiento:</span> {appt.treatment_name}
             </div>
           )}
           {appt.doctor_name && (

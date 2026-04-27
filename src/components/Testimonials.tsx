@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { Star, Quote } from 'lucide-react';
+import { Star, Quote, ExternalLink } from 'lucide-react';
 
 type TestimonialItem = {
   name: string;
   treatment: string;
   rating: number;
   quote: string;
+  social_url?: string;
 };
 
 type TestimonialsProps = {
@@ -62,20 +63,30 @@ export function Testimonials({ testimonials }: TestimonialsProps) {
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
             whileHover={{ y: -5 }}
-            className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-default">
+            className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-default flex flex-col">
 
-              <div className="flex items-center gap-4 mb-6">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center font-serif font-medium text-xl"
-                  style={{ backgroundColor: 'color-mix(in srgb, var(--primary, #8B9E8B) 10%, transparent)', color: 'var(--primary, #8B9E8B)' }}>
-                  {t.name.charAt(0).toUpperCase()}
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-serif font-medium text-xl flex-shrink-0"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--primary, #8B9E8B) 10%, transparent)', color: 'var(--primary, #8B9E8B)' }}>
+                    {t.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="font-medium" style={{ color: 'var(--text, #2D2D2D)' }}>{t.name}</h4>
+                    <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--primary, #8B9E8B)' }}>
+                      {t.treatment}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-medium" style={{ color: 'var(--text, #2D2D2D)' }}>{t.name}</h4>
-                  <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--primary, #8B9E8B)' }}>
-                    {t.treatment}
-                  </p>
-                </div>
+                {t.social_url && (
+                  <a href={t.social_url} target="_blank" rel="noopener noreferrer"
+                    className="flex-shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors hover:bg-gray-50"
+                    style={{ borderColor: 'color-mix(in srgb, var(--primary, #8B9E8B) 40%, transparent)', color: 'var(--primary, #8B9E8B)' }}
+                    title="Ver reseña original">
+                    <ExternalLink className="w-3 h-3" /> Ver
+                  </a>
+                )}
               </div>
 
               <div className="flex gap-1 mb-4">

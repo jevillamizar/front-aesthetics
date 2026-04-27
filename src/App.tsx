@@ -27,13 +27,15 @@ type LandingPayload = {
     font_accent: string;
     logo_url: string;
     hero_image_url: string;
+    hero_image_urls: string[];
     trust_indicators: Array<{ icon: string; label: string; sub: string }>;
-    testimonials: Array<{ name: string; treatment: string; rating: number; quote: string }>;
+    testimonials: Array<{ name: string; treatment: string; rating: number; quote: string; social_url?: string }>;
     about_title: string;
     about_subtitle: string;
     about_description: string;
-    about_bullets: string[];
+    about_bullets: (string | { title: string; description?: string; image_url?: string })[];
     about_image_url: string;
+    about_image_urls: string[];
     about_badge_title: string;
     about_badge_text: string;
     phone: string;
@@ -116,6 +118,11 @@ export function App() {
   const heroHeadline = landingData?.landing?.headline?.trim() || undefined;
   const heroDescription = landingData?.landing?.description?.trim() || undefined;
   const heroImageUrl = landingData?.landing?.hero_image_url?.trim() || undefined;
+  const heroImageUrls = (
+    landingData?.landing?.hero_image_urls?.length
+      ? landingData.landing.hero_image_urls
+      : (landingData?.landing?.hero_image_url || '').split(/[\n,]+/)
+  ).map((u) => u.trim()).filter(Boolean);
   const trustIndicators = landingData?.landing?.trust_indicators;
 
   return (
@@ -144,7 +151,7 @@ export function App() {
               href="#services"
               className="nav-link text-sm font-medium transition-colors">
 
-              Tratamientos
+              Procedimientos
             </a>
             <a
               href="#about"
@@ -165,7 +172,7 @@ export function App() {
               Contacto
             </a>
             <Button size="sm" onClick={() => setAppointmentOpen(true)}>
-              Reservar Cita
+              Agendar valoración
             </Button>
           </div>
 
@@ -181,6 +188,7 @@ export function App() {
           headline={heroHeadline}
           description={heroDescription}
           heroImageUrl={heroImageUrl}
+          heroImageUrls={heroImageUrls}
           trustIndicators={trustIndicators}
         />
         <Services />

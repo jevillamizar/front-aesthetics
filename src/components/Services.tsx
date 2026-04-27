@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, X, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type TreatmentItem = {
@@ -9,9 +9,89 @@ type TreatmentItem = {
   slug: string | null;
   category: string;
   description: string;
+  long_description: string;
   duration_minutes: number;
   price: string;
+  image_url: string;
 };
+
+function ServiceModal({ item, onClose }: { item: TreatmentItem; onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <motion.div
+      ref={overlayRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
+      style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 16 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 transition-colors"
+        >
+          <X className="w-4 h-4 text-white" />
+        </button>
+
+        <div className="flex flex-col sm:flex-row">
+          {/* Image left */}
+          {item.image_url ? (
+            <div className="w-full sm:w-5/12 flex-shrink-0">
+              <img
+                src={item.image_url}
+                alt={item.name}
+                className="w-full h-56 sm:h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <div className="w-full sm:w-5/12 flex-shrink-0 flex items-center justify-center h-32 sm:h-auto bg-[#F5F5F3]">
+              <Sparkles className="w-10 h-10 text-[#8B9E8B] opacity-30" />
+            </div>
+          )}
+
+          {/* Content right */}
+          <div className="flex-1 p-6 md:p-8 flex flex-col justify-center overflow-y-auto max-h-[70vh]">
+            <h3 className="text-xl font-semibold text-[#2D2D2D] mb-1 leading-snug">{item.name}</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-sm font-medium text-[#8B9E8B]">{formatPrice(item.price)}</span>
+              <span className="flex items-center gap-1 text-xs text-[#6B6B6B]">
+                <Clock className="w-3.5 h-3.5" />{item.duration_minutes} min
+              </span>
+            </div>
+            {item.long_description ? (
+              <p className="text-sm text-[#6B6B6B] leading-relaxed whitespace-pre-line">{item.long_description}</p>
+            ) : (
+              <p className="text-sm text-[#6B6B6B] leading-relaxed">{item.description}</p>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 type CategoryGroup = {
   id: string;
@@ -43,6 +123,7 @@ function formatPrice(price: string | number): string {
 export function Services() {
   const [treatments, setTreatments] = useState<TreatmentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<TreatmentItem | null>(null);
 
   const apiBase =
     (import.meta.env.VITE_API_BASE ?? '').trim() ||
@@ -70,7 +151,7 @@ export function Services() {
     return (
       <section className="py-24 bg-white" id="services">
         <div className="container mx-auto px-4 md:px-6 text-center text-[#6B6B6B]">
-          Cargando tratamientos…
+          Cargando procedimientos…
         </div>
       </section>
     );
@@ -83,7 +164,7 @@ export function Services() {
       <div className="container mx-auto px-4 md:px-6">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-light text-[#2D2D2D] mb-4">
-            Tratamientos Diseñados para Ti
+            Procedimientos Diseñados para Ti
           </h2>
           <p className="text-[#6B6B6B] max-w-2xl mx-auto">
             Nuestro menú completo de servicios está diseñado para abordar tus
@@ -148,44 +229,50 @@ export function Services() {
 
               {categories
                 .find((c) => c.id === currentTab)
-                ?.items.map((item, index) =>
-              <motion.div
-                key={item.id}
-                initial={{
-                  opacity: 0,
-                  y: 20
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0
-                }}
-                transition={{
-                  delay: index * 0.1
-                }}
-                className="group p-8 rounded-2xl bg-[#F5F5F3] hover:bg-white border border-transparent hover:border-[#8B9E8B]/20 transition-all duration-300 hover:shadow-lg hover:shadow-[#8B9E8B]/5">
+                ?.items.map((item, index) => {
+                  const hasDetail = !!(item.long_description || item.image_url);
+                  return (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    onClick={() => hasDetail && setSelected(item)}
+                    className={cn(
+                      'group p-8 rounded-2xl bg-[#F5F5F3] hover:bg-white border border-transparent hover:border-[#8B9E8B]/20 transition-all duration-300 hover:shadow-lg hover:shadow-[#8B9E8B]/5',
+                      hasDetail && 'cursor-pointer'
+                    )}>
 
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-xl font-medium text-[#2D2D2D]">
-                        {item.name}
-                      </h3>
+                      <h3 className="text-xl font-medium text-[#2D2D2D]">{item.name}</h3>
+                      {hasDetail && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-[#8B9E8B] text-[#8B9E8B] opacity-70 flex-shrink-0 ml-2">
+                          Ver más
+                        </span>
+                      )}
                     </div>
                     <p className="text-[#6B6B6B] text-sm leading-relaxed mb-6 min-h-[60px]">
                       {item.description}
                     </p>
                     <div className="pt-4 border-t border-[#8B9E8B]/10 flex justify-between items-center">
-                      <span className="text-sm font-medium text-[#8B9E8B]">
-                        {formatPrice(item.price)}
-                      </span>
+                      <span className="text-sm font-medium text-[#8B9E8B]">{formatPrice(item.price)}</span>
                       <span className="text-xs text-[#6B6B6B] uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
                         {item.duration_minutes} min
                       </span>
                     </div>
                   </motion.div>
-              )}
+                  );
+                })}
             </motion.div>
           </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {selected && (
+          <ServiceModal item={selected} onClose={() => setSelected(null)} />
+        )}
+      </AnimatePresence>
     </section>);
 
 }

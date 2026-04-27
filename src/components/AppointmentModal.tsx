@@ -257,7 +257,7 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium text-[#6B6B6B]">Tratamiento</label>
+                        <label className="text-xs font-medium text-[#6B6B6B]">Procedimiento</label>
                         <select
                           name="treatment_slug"
                           onChange={(e) => {

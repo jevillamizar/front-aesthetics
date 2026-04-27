@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from './ui/Button';
 import { Star, Award, Clock, Users, ArrowRight, type LucideIcon, Heart, Shield, Zap, ThumbsUp, TrendingUp, CheckCircle } from 'lucide-react';
@@ -13,6 +14,7 @@ type HeroProps = {
   headline?: string;
   description?: string;
   heroImageUrl?: string;
+  heroImageUrls?: string[];
   trustIndicators?: TrustIndicator[];
 };
 
@@ -36,7 +38,26 @@ const defaultIndicators: TrustIndicator[] = [
   { icon: 'star', label: '5-Star Rated', sub: 'En Google' },
 ];
 
-export function Hero({ onBook, headline, description, heroImageUrl, trustIndicators }: HeroProps) {
+export function Hero({ onBook, headline, description, heroImageUrl, heroImageUrls, trustIndicators }: HeroProps) {
+  const images = useMemo(() => {
+    const fromList = (heroImageUrls ?? []).map((url) => url.trim()).filter(Boolean);
+    if (fromList.length > 0) return fromList;
+    return heroImageUrl?.trim() ? [heroImageUrl.trim()] : [];
+  }, [heroImageUrl, heroImageUrls]);
+  const [activeImage, setActiveImage] = useState(0);
+
+  useEffect(() => {
+    setActiveImage(0);
+  }, [images]);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const id = window.setInterval(() => {
+      setActiveImage((current) => (current + 1) % images.length);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [images]);
+
   const containerVariants = {
     hidden: {
       opacity: 0
@@ -66,16 +87,19 @@ export function Hero({ onBook, headline, description, heroImageUrl, trustIndicat
   return (
     <section id="home" className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-[#F5F5F3] pt-20 pb-16 scroll-mt-24">
       {/* Abstract Background Elements */}
-      <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-[#E8ECE8] to-transparent opacity-60" />
+      <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-[#E8ECE8] to-transparent opacity-40" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#8B9E8B]/5 rounded-full blur-3xl" />
 
-      {heroImageUrl ? (
+      {images.length > 0 ? (
         <div className="absolute inset-0">
-          <div
-            className="absolute inset-0 bg-center bg-cover"
-            style={{ backgroundImage: `url(${heroImageUrl})` }}
-          />
-          <div className="absolute inset-0 bg-[#F5F5F3]/80" />
+          {images.map((imageUrl, index) => (
+            <div
+              key={`${imageUrl}-${index}`}
+              className={`absolute inset-0 bg-center bg-cover transition-opacity duration-1000 ${index === activeImage ? 'opacity-100' : 'opacity-0'}`}
+              style={{ backgroundImage: `url(${imageUrl})` }}
+            />
+          ))}
+          <div className="absolute inset-0 bg-[#F5F5F3]/50" />
         </div>
       ) : null}
 
@@ -130,8 +154,8 @@ export function Hero({ onBook, headline, description, heroImageUrl, trustIndicat
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
 
             <Button size="lg" className="w-full sm:w-auto group" onClick={onBook}>
-              Reserva tu consulta
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              ¡Agenda tu cita!
+              
             </Button>
             <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
               <a href="#services">Ver nuestros servicios</a>

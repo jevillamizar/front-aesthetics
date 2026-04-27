@@ -367,7 +367,7 @@ export function DashboardHome() {
   const statCards = [
     { label: 'Citas Hoy',      value: stats?.appointments_today  ?? '—', icon: CalendarDays, color: 'bg-blue-50 text-blue-600' },
     { label: 'Pacientes',      value: stats?.patients_total       ?? '—', icon: Users,        color: 'bg-green-50 text-green-600' },
-    { label: 'Tratamientos',   value: stats?.treatments_active    ?? '—', icon: Scissors,     color: 'bg-purple-50 text-purple-600' },
+    { label: 'Procedimientos', value: stats?.treatments_active    ?? '—', icon: Scissors,     color: 'bg-purple-50 text-purple-600' },
     { label: 'Citas este mes', value: stats?.appointments_month   ?? '—', icon: TrendingUp,   color: 'bg-amber-50 text-amber-600' },
   ];
 

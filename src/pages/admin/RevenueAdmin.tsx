@@ -183,7 +183,7 @@ export function RevenueAdmin() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top treatments */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-5">Top Tratamientos</h2>
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-5">Top Procedimientos</h2>
               {data.top_treatments.length === 0 ? (
                 <p className="text-sm text-gray-400">Sin datos aún</p>
               ) : (

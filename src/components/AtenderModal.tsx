@@ -85,7 +85,7 @@ function ApptInfo({ appt }: { appt: ApptDetail }) {
         </div>
         {appt.treatment_name && (
           <div className="text-sm text-gray-600">
-            <span className="font-medium">Tratamiento:</span> {appt.treatment_name}
+            <span className="font-medium">Procedimiento:</span> {appt.treatment_name}
             {appt.treatment_price != null && (
               <span className="text-gray-400 ml-1">({cop(appt.treatment_price)})</span>
             )}

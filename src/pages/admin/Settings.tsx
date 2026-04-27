@@ -12,7 +12,7 @@ const tabs: { id: Tab; label: string; icon: typeof Palette }[] = [
   { id: 'account', label: 'Mi Cuenta', icon: UserCircle },
   { id: 'clinic', label: 'Datos de la Clínica', icon: Building2 },
   { id: 'landing', label: 'Landing Page', icon: Palette },
-  { id: 'treatments', label: 'Tratamientos', icon: Scissors },
+  { id: 'treatments', label: 'Procedimientos', icon: Scissors },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
 ];
 

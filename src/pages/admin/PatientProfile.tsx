@@ -696,7 +696,7 @@ export function PatientProfile() {
                           {r.diagnosis       && <InfoRow label="Diagnóstico" value={r.diagnosis} />}
                           {r.treatment_plan  && (
                             <div className="sm:col-span-2">
-                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Plan de tratamiento</p>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Plan de procedimiento</p>
                               <p className="text-sm text-gray-800 whitespace-pre-line">{r.treatment_plan}</p>
                             </div>
                           )}
@@ -743,7 +743,7 @@ export function PatientProfile() {
                         </div>
                         {r.treatment_items.length > 0 && (
                           <div>
-                            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Tratamientos</p>
+                            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Procedimientos</p>
                             <div className="space-y-1">
                               {r.treatment_items.map((it, i) => (
                                 <div key={i} className="flex justify-between text-sm text-gray-700 bg-white border border-gray-100 px-3 py-2 rounded-lg">

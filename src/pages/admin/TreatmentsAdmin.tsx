@@ -1,6 +1,56 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
-import { Plus, Pencil, Trash2, Loader2, X, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, X, Save, Upload } from 'lucide-react';
+
+function TreatmentImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiFetch('/api/upload-image/', { method: 'POST', body: form, headers: {} });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Error al subir');
+      onChange(json.url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al subir');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {value && (
+        <div className="relative inline-block">
+          <img src={value} alt="preview" className="h-24 w-auto rounded-lg object-cover border border-gray-200" />
+          <button type="button" onClick={() => onChange('')}
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input ref={inputRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          {uploading ? 'Subiendo...' : 'Subir imagen'}
+        </button>
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value)}
+          placeholder="o pega una URL"
+          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900" />
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 type Treatment = {
   id: number;
@@ -11,6 +61,8 @@ type Treatment = {
   duration_minutes: number;
   price: string | null;
   is_active: boolean;
+  image_url: string;
+  long_description: string;
 };
 
 type FormData = Omit<Treatment, 'id'> & { id?: number };
@@ -23,6 +75,8 @@ const emptyForm: FormData = {
   duration_minutes: 30,
   price: null,
   is_active: true,
+  image_url: '',
+  long_description: '',
 };
 
 export function TreatmentsAdmin() {
@@ -42,7 +96,7 @@ export function TreatmentsAdmin() {
       const json = await res.json();
       setTreatments(json.treatments || []);
     } catch {
-      setError('No se pudieron cargar los tratamientos');
+      setError('No se pudieron cargar los procedimientos');
     } finally {
       setLoading(false);
     }
@@ -68,6 +122,8 @@ export function TreatmentsAdmin() {
         duration_minutes: editing.duration_minutes,
         price: editing.price || null,
         is_active: editing.is_active,
+        image_url: editing.image_url || '',
+        long_description: editing.long_description || '',
       };
 
       const res = await apiFetch(url, { method, body: JSON.stringify(body) });
@@ -87,7 +143,7 @@ export function TreatmentsAdmin() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de eliminar este tratamiento?')) return;
+    if (!confirm('¿Estás seguro de eliminar este procedimiento?')) return;
     try {
       await apiFetch(`/api/treatments/${id}/`, { method: 'DELETE' });
       await load();
@@ -108,14 +164,14 @@ export function TreatmentsAdmin() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Tratamientos</h1>
-          <p className="text-gray-500 mt-1">{treatments.length} tratamiento{treatments.length !== 1 ? 's' : ''} registrado{treatments.length !== 1 ? 's' : ''}</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Procedimientos</h1>
+          <p className="text-gray-500 mt-1">{treatments.length} procedimiento{treatments.length !== 1 ? 's' : ''} registrado{treatments.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setEditing({ ...emptyForm })}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
         >
-          <Plus className="w-4 h-4" /> Nuevo Tratamiento
+          <Plus className="w-4 h-4" /> Nuevo Procedimiento
         </button>
       </div>
 
@@ -129,7 +185,7 @@ export function TreatmentsAdmin() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-900">
-                {editing.id ? 'Editar Tratamiento' : 'Nuevo Tratamiento'}
+                {editing.id ? 'Editar Procedimiento' : 'Nuevo Procedimiento'}
               </h2>
               <button onClick={() => setEditing(null)} className="p-1 text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
@@ -203,13 +259,24 @@ export function TreatmentsAdmin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción corta</label>
                 <textarea
                   value={editing.description}
                   onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                  rows={3}
+                  rows={2}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  placeholder="Descripción del tratamiento"
+                  placeholder="Resumen breve visible en la tarjeta del procedimiento"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción detallada</label>
+                <textarea
+                  value={editing.long_description}
+                  onChange={(e) => setEditing({ ...editing, long_description: e.target.value })}
+                  rows={5}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="Explicación completa: beneficios, indicaciones, cuidados, etc."
                 />
               </div>
 
@@ -233,6 +300,14 @@ export function TreatmentsAdmin() {
                     placeholder="150.00"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen</label>
+                <TreatmentImageUploader
+                  value={editing.image_url}
+                  onChange={(url) => setEditing({ ...editing, image_url: url })}
+                />
               </div>
 
               <label className="flex items-center gap-3 cursor-pointer">
@@ -270,7 +345,7 @@ export function TreatmentsAdmin() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {treatments.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-gray-500 text-sm">No hay tratamientos registrados</p>
+            <p className="text-gray-500 text-sm">No hay procedimientos registrados</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

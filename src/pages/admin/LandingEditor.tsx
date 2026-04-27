@@ -1,15 +1,91 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { apiFetch } from '../../lib/api';
-import { Save, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, ExternalLink, Plus, Trash2, GripVertical, Upload, X } from 'lucide-react';
+import type { AboutBullet } from '../../components/About';
 
 type LandingData = Record<string, unknown>;
+
+function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setError('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiFetch('/api/upload-image/', { method: 'POST', body: form, headers: {} });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Error al subir');
+      onChange(json.url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al subir');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {value && (
+        <div className="relative inline-block">
+          <img src={value} alt="preview" className="h-24 w-auto rounded-lg object-cover border border-gray-200" />
+          <button type="button" onClick={() => onChange('')}
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+        />
+        <button type="button" onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          {uploading ? 'Subiendo...' : 'Subir imagen'}
+        </button>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="o pega una URL"
+          className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-gray-900"
+        />
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 type FieldDef = {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'color' | 'json' | 'image' | 'checkbox';
+  type: 'text' | 'textarea' | 'color' | 'json' | 'image' | 'checkbox' | 'bullets' | 'multi_image' | 'trust_indicators' | 'testimonials';
   placeholder?: string;
 };
+
+type TestimonialItem = { name: string; treatment: string; rating: number; quote: string; social_url?: string };
+
+type TrustIndicator = { icon: string; label: string; sub: string };
+
+const TRUST_ICONS = [
+  { value: 'clock',   label: 'Reloj' },
+  { value: 'award',   label: 'Premio' },
+  { value: 'users',   label: 'Personas' },
+  { value: 'star',    label: 'Estrella' },
+  { value: 'shield',  label: 'Escudo' },
+  { value: 'heart',   label: 'Corazón' },
+  { value: 'check',   label: 'Check' },
+  { value: 'zap',     label: 'Rayo' },
+];
 
 const sections: { title: string; fields: FieldDef[] }[] = [
   {
@@ -17,8 +93,8 @@ const sections: { title: string; fields: FieldDef[] }[] = [
     fields: [
       { key: 'headline', label: 'Titular', type: 'text', placeholder: 'Ej: Tu Mejor Versión Comienza Aquí' },
       { key: 'description', label: 'Descripción', type: 'textarea', placeholder: 'Texto debajo del titular' },
-      { key: 'hero_image', label: 'Imagen Hero', type: 'image' },
-      { key: 'trust_indicators', label: 'Trust Indicators (JSON)', type: 'json', placeholder: '[{"icon":"clock","label":"15+ Años","sub":"Experiencia"}]' },
+      { key: 'hero_image_urls', label: 'Imagen(es) Hero', type: 'multi_image' },
+      { key: 'trust_indicators', label: 'Indicadores de Confianza', type: 'trust_indicators' },
     ],
   },
   {
@@ -45,8 +121,8 @@ const sections: { title: string; fields: FieldDef[] }[] = [
       { key: 'about_title', label: 'Título', type: 'text', placeholder: 'Belleza respaldada por la ciencia,' },
       { key: 'about_subtitle', label: 'Subtítulo (itálica)', type: 'text', placeholder: 'Entregado con arte' },
       { key: 'about_description', label: 'Descripción', type: 'textarea', placeholder: 'Párrafos separados por salto de línea' },
-      { key: 'about_bullets', label: 'Bullets (JSON array)', type: 'json', placeholder: '["Certificados","Aprobados"]' },
-      { key: 'about_image', label: 'Imagen About', type: 'image' },
+      { key: 'about_bullets', label: 'Diferenciadores (máx. 6)', type: 'bullets' },
+      { key: 'about_image_urls', label: 'Imagen(es) About', type: 'multi_image' },
       { key: 'about_badge_title', label: 'Badge título', type: 'text', placeholder: 'Top 1%' },
       { key: 'about_badge_text', label: 'Badge texto', type: 'text', placeholder: 'Inyector en la región' },
     ],
@@ -54,7 +130,7 @@ const sections: { title: string; fields: FieldDef[] }[] = [
   {
     title: 'Testimonios',
     fields: [
-      { key: 'testimonials', label: 'Testimonios (JSON)', type: 'json', placeholder: '[{"name":"María","treatment":"Botox","rating":5,"quote":"..."}]' },
+      { key: 'testimonials', label: 'Testimonios', type: 'testimonials' },
     ],
   },
   {
@@ -119,14 +195,18 @@ export function LandingEditor() {
     try {
       const hasFiles = Object.keys(files).length > 0;
 
+      const cleanValue = (v: unknown) =>
+        Array.isArray(v) ? v.filter((x) => x !== '' && x !== null && x !== undefined) : v;
+
       if (hasFiles) {
         const form = new FormData();
         for (const [k, v] of Object.entries(data)) {
           if (k === 'id' || k.endsWith('_url')) continue;
-          if (Array.isArray(v) || (typeof v === 'object' && v !== null)) {
-            form.append(k, JSON.stringify(v));
+          const clean = cleanValue(v);
+          if (Array.isArray(clean) || (typeof clean === 'object' && clean !== null)) {
+            form.append(k, JSON.stringify(clean));
           } else {
-            form.append(k, String(v ?? ''));
+            form.append(k, String(clean ?? ''));
           }
         }
         for (const [k, f] of Object.entries(files)) {
@@ -140,7 +220,7 @@ export function LandingEditor() {
         const body: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(data)) {
           if (k === 'id' || k.endsWith('_url')) continue;
-          body[k] = v;
+          body[k] = cleanValue(v);
         }
         const res = await apiFetch('/api/landing/', {
           method: 'PUT',
@@ -303,6 +383,239 @@ function FieldInput({
             placeholder={field.placeholder}
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === 'testimonials') {
+    const raw = Array.isArray(value) ? value as Partial<TestimonialItem>[] : [];
+    const items: TestimonialItem[] = raw.map((r) => ({
+      name: r.name || '',
+      treatment: r.treatment || '',
+      rating: r.rating ?? 5,
+      quote: r.quote || '',
+      social_url: r.social_url || '',
+    }));
+    const update = (idx: number, patch: Partial<TestimonialItem>) =>
+      onChange(items.map((it, i) => i === idx ? { ...it, ...patch } : it));
+    const add = () => onChange([...items, { name: '', treatment: '', rating: 5, quote: '', social_url: '' }]);
+    const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">{field.label}</label>
+          <button type="button" onClick={add}
+            className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Agregar
+          </button>
+        </div>
+        {items.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-lg">Sin testimonios aún</p>
+        )}
+        <div className="space-y-3">
+          {items.map((it, i) => (
+            <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-2.5 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-400 w-5 flex-shrink-0">{i + 1}</span>
+                <input type="text" value={it.name}
+                  onChange={(e) => update(i, { name: e.target.value })}
+                  placeholder="Nombre"
+                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                <input type="text" value={it.treatment}
+                  onChange={(e) => update(i, { treatment: e.target.value })}
+                  placeholder="Procedimiento"
+                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                <select value={it.rating}
+                  onChange={(e) => update(i, { rating: Number(e.target.value) })}
+                  className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
+                  {[5,4,3,2,1].map((n) => <option key={n} value={n}>{'★'.repeat(n)}</option>)}
+                </select>
+                <button type="button" onClick={() => remove(i)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <textarea value={it.quote}
+                onChange={(e) => update(i, { quote: e.target.value })}
+                placeholder='"El mejor lugar..."'
+                rows={2}
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
+              <input type="url" value={it.social_url || ''}
+                onChange={(e) => update(i, { social_url: e.target.value })}
+                placeholder="Enlace red social (opcional) — https://g.co/..."
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === 'trust_indicators') {
+    const raw = Array.isArray(value) ? value as (Partial<TrustIndicator>)[] : [];
+    const indicators: TrustIndicator[] = raw.map((r) => ({
+      icon: r.icon || 'star',
+      label: r.label || '',
+      sub: r.sub || '',
+    }));
+    const update = (idx: number, patch: Partial<TrustIndicator>) => {
+      onChange(indicators.map((item, i) => i === idx ? { ...item, ...patch } : item));
+    };
+    const add = () => { if (indicators.length < 6) onChange([...indicators, { icon: 'star', label: '', sub: '' }]); };
+    const remove = (idx: number) => onChange(indicators.filter((_, i) => i !== idx));
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">{field.label}</label>
+          {indicators.length < 6 && (
+            <button type="button" onClick={add}
+              className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Agregar
+            </button>
+          )}
+        </div>
+        {indicators.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-lg">Sin indicadores aún</p>
+        )}
+        <div className="space-y-2">
+          {indicators.map((item, i) => (
+            <div key={i} className="grid grid-cols-[auto_1fr_1fr_auto] gap-2 items-center border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50/50">
+              <select
+                value={item.icon}
+                onChange={(e) => update(i, { icon: e.target.value })}
+                className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
+                {TRUST_ICONS.map((ic) => (
+                  <option key={ic.value} value={ic.value}>{ic.label}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={item.label}
+                onChange={(e) => update(i, { label: e.target.value })}
+                placeholder="Número / Valor  (ej: 15+)"
+                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <input
+                type="text"
+                value={item.sub}
+                onChange={(e) => update(i, { sub: e.target.value })}
+                placeholder="Etiqueta  (ej: Años)"
+                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <button type="button" onClick={() => remove(i)}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mt-2">Icono · Valor principal · Etiqueta descriptiva</p>
+      </div>
+    );
+  }
+
+  if (field.type === 'bullets') {
+    const raw = Array.isArray(value) ? value as (string | AboutBullet)[] : [];
+    const bullets: AboutBullet[] = raw.map((b) =>
+      typeof b === 'string' ? { title: b } : (b as AboutBullet)
+    );
+    const update = (idx: number, patch: Partial<AboutBullet>) => {
+      const next = bullets.map((b, i) => i === idx ? { ...b, ...patch } : b);
+      onChange(next);
+    };
+    const add = () => { if (bullets.length < 6) onChange([...bullets, { title: '' }]); };
+    const remove = (idx: number) => onChange(bullets.filter((_, i) => i !== idx));
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700">{field.label}</label>
+          {bullets.length < 6 && (
+            <button type="button" onClick={add}
+              className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Agregar
+            </button>
+          )}
+        </div>
+        <div className="space-y-3">
+          {bullets.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-lg">Sin diferenciadores aún</p>
+          )}
+          {bullets.map((b, i) => (
+            <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                <span className="text-xs font-bold text-gray-400 w-5">{i + 1}</span>
+                <input
+                  type="text"
+                  value={b.title}
+                  onChange={(e) => update(i, { title: e.target.value })}
+                  placeholder="Título del diferenciador"
+                  className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                />
+                <button type="button" onClick={() => remove(i)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <textarea
+                value={b.description ?? ''}
+                onChange={(e) => update(i, { description: e.target.value })}
+                placeholder="Descripción (opcional — el usuario podrá expandirla)"
+                rows={2}
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+              />
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Imagen (opcional)</label>
+                <ImageUploader
+                  value={b.image_url ?? ''}
+                  onChange={(url) => update(i, { image_url: url })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field.type === 'multi_image') {
+    const urls: string[] = Array.isArray(value)
+      ? (value as string[])
+      : (imageUrl ? [imageUrl] : []);
+    const setUrls = (next: string[]) => onChange(next);
+    const addSlot = () => setUrls([...urls, '']);
+    const removeSlot = (i: number) => setUrls(urls.filter((_, j) => j !== i));
+    const updateSlot = (i: number, url: string) => {
+      const next = [...urls];
+      next[i] = url;
+      setUrls(next);
+    };
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-sm font-medium text-gray-700">{field.label}</label>
+          <button type="button" onClick={addSlot}
+            className="inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Agregar imagen
+          </button>
+        </div>
+        {urls.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-lg">Sin imágenes aún</p>
+        )}
+        <div className="space-y-3">
+          {urls.map((url, i) => (
+            <div key={i} className="border border-gray-200 rounded-xl p-3 bg-gray-50/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-400">Imagen {i + 1}</span>
+                <button type="button" onClick={() => removeSlot(i)}
+                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <ImageUploader value={url} onChange={(newUrl) => updateSlot(i, newUrl)} />
+            </div>
+          ))}
         </div>
       </div>
     );
