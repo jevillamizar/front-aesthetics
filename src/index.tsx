@@ -8,6 +8,7 @@ import { Login } from './pages/Login';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminLayout } from './layouts/AdminLayout';
 import { DashboardHome } from './pages/admin/DashboardHome';
+import { Agenda } from './pages/admin/Agenda';
 import { AppointmentsAdmin } from './pages/admin/AppointmentsAdmin';
 import { AppointmentComplete } from './pages/admin/AppointmentComplete';
 import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
@@ -44,7 +45,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="treatments" element={<TreatmentsAdmin />} />
             <Route path="appointments" element={<AppointmentsAdmin />} />
             <Route path="appointments/:id/complete" element={<AppointmentComplete />} />
-            <Route path="calendar" element={<Navigate to="/admin" replace />} />
+            <Route path="agenda" element={<Agenda />} />
+            <Route path="calendar" element={<Navigate to="/admin/agenda" replace />} />
             <Route path="revenue" element={<RevenueAdmin />} />
             <Route path="doctors" element={<DoctorsAdmin />} />
             <Route path="doctors/:id" element={<DoctorProfile />} />

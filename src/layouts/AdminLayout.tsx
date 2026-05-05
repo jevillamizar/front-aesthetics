@@ -18,10 +18,12 @@ import {
   Bell,
   UserCircle,
   Building2,
+  LayoutDashboard,
 } from 'lucide-react';
 
 const topItems = [
-  { to: '/admin', icon: CalendarRange, label: 'Agenda', end: true, adminOnly: false },
+  { to: '/admin', icon: LayoutDashboard, label: 'Inicio', end: true, adminOnly: false },
+  { to: '/admin/agenda', icon: CalendarRange, label: 'Agenda', end: false, adminOnly: false },
   { to: '/admin/appointments', icon: CalendarDays, label: 'Citas', end: false, adminOnly: false },
   { to: '/admin/patients', icon: Users, label: 'Pacientes', end: false, adminOnly: false },
   { to: '/admin/doctors', icon: Stethoscope, label: 'Médicos', end: false, adminOnly: true },

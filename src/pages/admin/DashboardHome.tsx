@@ -4,8 +4,9 @@ import { apiFetch } from '../../lib/api';
 import { AtenderModal } from '../../components/AtenderModal';
 import { NewAppointmentModal } from '../../components/NewAppointmentModal';
 import {
-  CalendarDays, Users, Scissors, TrendingUp, Loader2,
-  ChevronLeft, ChevronRight, Plus,
+  Users, Loader2, Plus, CalendarX2, CheckCircle2,
+  Clock3, DollarSign, ChevronDown, ChevronUp, CalendarDays,
+  Eye, Pencil, X as XIcon, AlertTriangle,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -15,21 +16,29 @@ type Stats = {
   appointments_month: number;
   patients_total: number;
   treatments_active: number;
+  valoraciones_no_asistidas: number;
+  procedimientos_atendidos: number;
+  procedimientos_pendientes: number;
+  ingresos_hoy: number;
 };
 
-type Appt = {
+type TodayAppt = {
   id: number;
   starts_at: string;
   ends_at: string;
   status: string;
+  appointment_type: string;
+  treatment_name: string;
   patient_name: string;
-  treatment_name: string | null;
+  patient_id: number;
+  notes: string;
   doctor_id: number | null;
-  doctor_name: string | null;
+  doctor_name: string;
+  payment_status: string | null;
+  payment_amount: number | null;
 };
 
-type Doctor = { id: number; first_name: string; last_name: string; email: string };
-type View = 'month' | 'week' | 'day';
+type SortKey = 'starts_at' | 'treatment_name' | 'patient_name' | 'status' | 'payment_status' | 'doctor_name';
 
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
@@ -54,342 +63,146 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: 'Completada', CANCELED: 'Cancelada', NO_SHOW: 'No asistió',
 };
 
-const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const DAYS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-
 function fmt(iso: string, type: 'time' | 'date') {
   const d = new Date(iso);
   if (type === 'time') return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
 }
-function isoDate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function isToday(d: Date, today: Date) {
-  return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-}
 
-/* ── Month Grid ────────────────────────────────────────────────────────── */
+/* ── Payment badge ──────────────────────────────────────────────────────── */
 
-function MonthView({
-  year, month, appointments, onDayClick, onApptClick, today,
-}: {
-  year: number; month: number; appointments: Appt[];
-  onDayClick: (d: Date) => void; onApptClick: (id: number) => void; today: Date;
-}) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (Date | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
+const PAY_COLORS: Record<string, string> = {
+  PAID:     'bg-green-100 text-green-700 border-green-200',
+  PARTIAL:  'bg-yellow-100 text-yellow-700 border-yellow-200',
+  PENDING:  'bg-gray-100 text-gray-500 border-gray-200',
+  REFUNDED: 'bg-red-100 text-red-600 border-red-200',
+};
+const PAY_LABEL: Record<string, string> = {
+  PAID: 'Pagado', PARTIAL: 'Parcial', PENDING: 'Pendiente', REFUNDED: 'Reembolsado',
+};
 
-  const byDay = new Map<string, Appt[]>();
-  for (const a of appointments) {
-    const k = a.starts_at.slice(0, 10);
-    if (!byDay.has(k)) byDay.set(k, []);
-    byDay.get(k)!.push(a);
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-gray-100">
-        {DAYS_SHORT.map((d) => (
-          <div key={d} className="py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">{d}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 divide-x divide-gray-50">
-        {cells.map((d, i) => {
-          const key = d ? isoDate(d) : '';
-          const appts = d ? (byDay.get(key) || []) : [];
-          const shown = appts.slice(0, 3);
-          const extra = appts.length - 3;
-          return (
-            <div
-              key={i}
-              className={`min-h-[100px] border-b border-gray-50 p-1.5 ${d ? 'cursor-pointer hover:bg-gray-50/50' : 'bg-gray-50/30'}`}
-              onClick={() => d && onDayClick(d)}
-            >
-              {d && (
-                <>
-                  <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-1 ${
-                    isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-700'
-                  }`}>
-                    {d.getDate()}
-                  </span>
-                  <div className="space-y-0.5">
-                    {shown.map((a) => (
-                      <div
-                        key={a.id}
-                        onClick={(e) => { e.stopPropagation(); onApptClick(a.id); }}
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border truncate cursor-pointer hover:opacity-80 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[a.status] ?? 'bg-gray-400'}`} />
-                        <span className="truncate">{fmt(a.starts_at, 'time')} {a.patient_name.split(' ')[0]}</span>
-                      </div>
-                    ))}
-                    {extra > 0 && <div className="text-xs text-gray-400 px-1.5">+{extra} más</div>}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
+  if (!active) return <ChevronDown className="w-3 h-3 text-gray-300" />;
+  return dir === 'asc'
+    ? <ChevronUp className="w-3 h-3 text-gray-600" />
+    : <ChevronDown className="w-3 h-3 text-gray-600" />;
 }
 
-/* ── Week Grid ─────────────────────────────────────────────────────────── */
-
-const HOUR_START = 7;
-const HOUR_END   = 21;
-const TOTAL_MINS = (HOUR_END - HOUR_START) * 60;
-
-function WeekView({
-  weekStart, appointments, onApptClick, today,
-}: {
-  weekStart: Date; appointments: Appt[]; onApptClick: (id: number) => void; today: Date;
-}) {
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate() + i);
-    return d;
-  });
-  const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-gray-100">
-        <div />
-        {days.map((d, i) => (
-          <div key={i} className={`py-3 text-center border-l border-gray-100 ${isToday(d, today) ? 'bg-gray-50' : ''}`}>
-            <p className="text-xs text-gray-500 uppercase">{DAYS_SHORT[d.getDay()]}</p>
-            <p className={`text-base font-semibold mt-0.5 w-8 h-8 mx-auto flex items-center justify-center rounded-full ${isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-900'}`}>
-              {d.getDate()}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div className="overflow-y-auto max-h-[600px]">
-        <div className="relative grid grid-cols-[56px_repeat(7,1fr)]">
-          {hours.map((h) => (
-            <div key={h} className="contents">
-              <div className="py-6 px-2 text-right">
-                <span className="text-xs text-gray-400">{h}:00</span>
-              </div>
-              {days.map((_, di) => (
-                <div key={di} className="border-l border-t border-gray-50 h-12" />
-              ))}
-            </div>
-          ))}
-          {days.map((d, di) => {
-            const key = isoDate(d);
-            const dayAppts = appointments.filter((a) => a.starts_at.slice(0, 10) === key);
-            return dayAppts.map((a) => {
-              const start = new Date(a.starts_at);
-              const end = new Date(a.ends_at);
-              const startMin = (start.getHours() - HOUR_START) * 60 + start.getMinutes();
-              const endMin = (end.getHours() - HOUR_START) * 60 + end.getMinutes();
-              const top = Math.max(0, (startMin / TOTAL_MINS) * 100);
-              const height = Math.max(2, ((endMin - startMin) / TOTAL_MINS) * 100);
-              const colLeft = `calc(56px + ${di} * (100% - 56px) / 7)`;
-              const colWidth = `calc((100% - 56px) / 7 - 2px)`;
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => onApptClick(a.id)}
-                  style={{ position: 'absolute', top: `${top}%`, height: `${height}%`, left: colLeft, width: colWidth }}
-                  className={`rounded px-1.5 py-0.5 text-xs border overflow-hidden cursor-pointer hover:opacity-90 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
-                >
-                  <p className="font-medium truncate">{a.patient_name.split(' ')[0]}</p>
-                  <p className="opacity-70 truncate">{fmt(a.starts_at, 'time')}</p>
-                </div>
-              );
-            });
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Day View ──────────────────────────────────────────────────────────── */
-
-function DayView({ date, appointments, onApptClick }: {
-  date: Date; appointments: Appt[]; onApptClick: (id: number) => void;
-}) {
-  const dayAppts = appointments
-    .filter((a) => a.starts_at.slice(0, 10) === isoDate(date))
-    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100">
-        <h3 className="font-medium text-gray-900">{date.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-        <p className="text-sm text-gray-500 mt-0.5">{dayAppts.length} cita{dayAppts.length !== 1 ? 's' : ''}</p>
-      </div>
-      {dayAppts.length === 0 ? (
-        <div className="py-12 text-center">
-          <CalendarDays className="w-7 h-7 text-gray-200 mx-auto mb-2" />
-          <p className="text-gray-400 text-sm">Sin citas para este día</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-50">
-          {dayAppts.map((a) => (
-            <div
-              key={a.id}
-              onClick={() => onApptClick(a.id)}
-              className="flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-gray-50/50"
-            >
-              <div className="flex flex-col items-center min-w-[52px]">
-                <span className="text-sm font-semibold text-gray-900">{fmt(a.starts_at, 'time')}</span>
-                <span className="text-xs text-gray-400">{fmt(a.ends_at, 'time')}</span>
-              </div>
-              <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${STATUS_DOT[a.status] ?? 'bg-gray-300'}`} />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900">{a.patient_name}</p>
-                {a.treatment_name && <p className="text-sm text-gray-500 truncate">{a.treatment_name}</p>}
-              </div>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full border flex-shrink-0 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                {STATUS_LABEL[a.status] ?? a.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Main Dashboard (Agenda) ───────────────────────────────────────────── */
+/* ── Main Dashboard (Inicio) ────────────────────────────────────────────── */
 
 export function DashboardHome() {
   const { user } = useAuth();
   const isDoctor = user?.role === 'DOCTOR';
   const today = new Date();
 
-  // Stats
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [todayAppts, setTodayAppts] = useState<TodayAppt[]>([]);
+  const [tableLoading, setTableLoading] = useState(true);
 
-  // Calendar state
-  const [view, setView] = useState<View>('week');
-  const [date, setDate] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-  const [appointments, setAppointments] = useState<Appt[]>([]);
-  const [calLoading, setCalLoading] = useState(false);
-
-  // Doctor filter
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [doctorFilter, setDoctorFilter] = useState<number | ''>('');
-
-  // Modals
   const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
   const [showNewAppt, setShowNewAppt] = useState(false);
+  const [editApptId, setEditApptId] = useState<number | null>(null);
+  const [cancelApptId, setCancelApptId] = useState<number | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
-  // Load stats
-  useEffect(() => {
-    apiFetch('/api/dashboard/')
-      .then((r) => r.json())
-      .then((data) => setStats(data.stats))
-      .finally(() => setStatsLoading(false));
+  const [sortKey, setSortKey] = useState<SortKey>('starts_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const loadData = useCallback(async () => {
+    setTableLoading(true);
+    try {
+      const res = await apiFetch('/api/dashboard/');
+      const data = await res.json();
+      setStats(data.stats);
+      setTodayAppts(data.today_appointments || []);
+    } finally {
+      setStatsLoading(false);
+      setTableLoading(false);
+    }
   }, []);
 
-  // Load doctors (admin only)
-  useEffect(() => {
-    if (isDoctor && user?.id) {
-      setDoctorFilter(user.id);
-    } else {
-      apiFetch('/api/doctors/').then((r) => r.json()).then((d) => setDoctors(d.doctors || []));
-    }
-  }, [isDoctor, user?.id]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Date range helper
-  const getRange = useCallback(() => {
-    if (view === 'month') {
-      const from = isoDate(new Date(date.getFullYear(), date.getMonth(), 1));
-      const to = isoDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
-      return { from, to };
-    }
-    if (view === 'week') {
-      const ws = new Date(date); ws.setDate(date.getDate() - date.getDay());
-      const we = new Date(ws); we.setDate(ws.getDate() + 6);
-      return { from: isoDate(ws), to: isoDate(we) };
-    }
-    return { from: isoDate(date), to: isoDate(date) };
-  }, [view, date]);
-
-  // Load appointments
-  const loadAppointments = useCallback(async () => {
-    setCalLoading(true);
+  const handleCancel = async () => {
+    if (!cancelApptId) return;
+    setCancelLoading(true); setCancelError('');
     try {
-      const { from, to } = getRange();
-      let url = `/api/appointments/?from=${from}&to=${to}`;
-      if (doctorFilter) url += `&doctor_id=${doctorFilter}`;
-      const res = await apiFetch(url);
-      const json = await res.json();
-      setAppointments(json.appointments || []);
-    } finally {
-      setCalLoading(false);
-    }
-  }, [getRange, doctorFilter]);
-
-  useEffect(() => { loadAppointments(); }, [loadAppointments]);
-
-  // Navigation
-  const navigate = (dir: 1 | -1) => {
-    const d = new Date(date);
-    if (view === 'month') d.setMonth(d.getMonth() + dir);
-    else if (view === 'week') d.setDate(d.getDate() + dir * 7);
-    else d.setDate(d.getDate() + dir);
-    setDate(d);
-  };
-  const goToday = () => {
-    const t = new Date();
-    if (view === 'month') setDate(new Date(t.getFullYear(), t.getMonth(), 1));
-    else setDate(t);
+      const r = await apiFetch(`/api/appointments/${cancelApptId}/`, {
+        method: 'PATCH', body: JSON.stringify({ status: 'CANCELED' }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al cancelar');
+      setCancelApptId(null);
+      loadData();
+    } catch (e: unknown) {
+      setCancelError(e instanceof Error ? e.message : 'Error');
+    } finally { setCancelLoading(false); }
   };
 
-  const weekStart = new Date(date);
-  if (view === 'week') weekStart.setDate(date.getDate() - date.getDay());
-
-  const headerLabel = () => {
-    if (view === 'month') return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
-    if (view === 'week') {
-      const ws = new Date(date); ws.setDate(date.getDate() - date.getDay());
-      const we = new Date(ws); we.setDate(ws.getDate() + 6);
-      return `${ws.getDate()} ${MONTHS[ws.getMonth()].slice(0,3)} — ${we.getDate()} ${MONTHS[we.getMonth()].slice(0,3)} ${we.getFullYear()}`;
-    }
-    return date.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
   };
 
-  const statCards = [
-    { label: 'Citas Hoy',      value: stats?.appointments_today  ?? '—', icon: CalendarDays, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Pacientes',      value: stats?.patients_total       ?? '—', icon: Users,        color: 'bg-green-50 text-green-600' },
-    { label: 'Procedimientos', value: stats?.treatments_active    ?? '—', icon: Scissors,     color: 'bg-purple-50 text-purple-600' },
-    { label: 'Citas este mes', value: stats?.appointments_month   ?? '—', icon: TrendingUp,   color: 'bg-amber-50 text-amber-600' },
+  const filtered = todayAppts
+    .filter(a => !statusFilter || a.status === statusFilter)
+    .sort((a, b) => {
+      const av = String(a[sortKey as keyof TodayAppt] ?? '');
+      const bv = String(b[sortKey as keyof TodayAppt] ?? '');
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+
+  const todayStr = today.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  const kpis = [
+    {
+      label: 'Pacientes',
+      value: stats?.patients_total ?? '—',
+      sub: 'Total registrados',
+      icon: Users,
+      color: 'bg-blue-50 text-blue-600',
+      border: 'border-blue-100',
+    },
+    {
+      label: 'Valoraciones no asistidas',
+      value: stats?.valoraciones_no_asistidas ?? '—',
+      sub: 'No show acumulado',
+      icon: CalendarX2,
+      color: 'bg-red-50 text-red-500',
+      border: 'border-red-100',
+    },
+    {
+      label: 'Procedimientos atendidos',
+      value: stats?.procedimientos_atendidos ?? '—',
+      sub: `${stats?.procedimientos_pendientes ?? '—'} pendientes hoy`,
+      icon: CheckCircle2,
+      color: 'bg-green-50 text-green-600',
+      border: 'border-green-100',
+    },
+    {
+      label: 'Ingresos del día',
+      value: stats
+        ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(stats.ingresos_hoy)
+        : '—',
+      sub: 'Pagos confirmados hoy',
+      icon: DollarSign,
+      color: 'bg-amber-50 text-amber-600',
+      border: 'border-amber-100',
+    },
   ];
 
-  const handleDone = useCallback(async () => {
-    loadAppointments();
-    // Refresh stats too
-    const r = await apiFetch('/api/dashboard/');
-    const data = await r.json();
-    setStats(data.stats);
-  }, [loadAppointments]);
+  const thCls = (_key: SortKey) =>
+    `px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700 whitespace-nowrap`;
 
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {isDoctor ? 'Mi Agenda' : 'Agenda'}
-          </h1>
-          <p className="text-gray-500 mt-0.5 text-sm">
-            {isDoctor ? 'Tu agenda personal' : 'Vista general de la clínica'}
-          </p>
+          <h1 className="text-2xl font-semibold text-gray-900">Inicio</h1>
+          <p className="text-gray-400 text-sm mt-0.5 capitalize">{todayStr}</p>
         </div>
         {!isDoctor && (
           <button
@@ -400,102 +213,354 @@ export function DashboardHome() {
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {statCards.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500">{s.label}</span>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.color}`}>
-                <s.icon className="w-4 h-4" />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {kpis.map((k) => (
+          <div key={k.label} className={`bg-white rounded-2xl border ${k.border} p-5 flex flex-col gap-3`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 leading-tight">{k.label}</span>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${k.color}`}>
+                <k.icon className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-xl font-semibold text-gray-900">
-              {statsLoading ? <Loader2 className="w-4 h-4 animate-spin text-gray-300" /> : s.value}
-            </p>
+            <div>
+              <p className="text-2xl font-bold text-gray-900 leading-none">
+                {statsLoading ? <Loader2 className="w-5 h-5 animate-spin text-gray-300" /> : k.value}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">{k.sub}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Calendar toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <h2 className="text-base font-semibold text-gray-900 min-w-[200px] text-center capitalize">{headerLabel()}</h2>
-          <button onClick={() => navigate(1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          </button>
-          <button onClick={goToday} className="ml-1 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Hoy
-          </button>
-          {calLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-300 ml-1" />}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Doctor filter (admin only) */}
-          {!isDoctor && doctors.length > 0 && (
-            <select
-              value={doctorFilter}
-              onChange={(e) => setDoctorFilter(e.target.value ? Number(e.target.value) : '')}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-            >
-              <option value="">Todos los médicos</option>
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.first_name || d.last_name ? `${d.first_name} ${d.last_name}`.trim() : d.email}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* View toggle */}
-          <div className="flex border border-gray-200 rounded-lg overflow-hidden bg-white">
-            {(['day', 'week', 'month'] as View[]).map((v) => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${view === v ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-                {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
-              </button>
+      {/* Today's appointments table */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-gray-400" />
+            <h2 className="text-sm font-semibold text-gray-900">Citas de hoy</h2>
+            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-500 font-medium">
+              {tableLoading ? '…' : filtered.length}
+            </span>
+          </div>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-900">
+            <option value="">Todos los estados</option>
+            {Object.entries(STATUS_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
             ))}
-          </div>
+          </select>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        {Object.entries(STATUS_LABEL).map(([k, label]) => (
-          <div key={k} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${STATUS_DOT[k]}`} />
-            <span className="text-xs text-gray-500">{label}</span>
+        {tableLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
           </div>
-        ))}
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+            <Clock3 className="w-8 h-8 mb-2 text-gray-200" />
+            <p className="text-sm">No hay citas para hoy</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className={thCls('treatment_name')} onClick={() => handleSort('treatment_name')}>
+                    <span className="flex items-center gap-1">Tratamiento <SortIcon active={sortKey === 'treatment_name'} dir={sortDir} /></span>
+                  </th>
+                  <th className={thCls('starts_at')} onClick={() => handleSort('starts_at')}>
+                    <span className="flex items-center gap-1">Fecha y hora <SortIcon active={sortKey === 'starts_at'} dir={sortDir} /></span>
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    Descripción
+                  </th>
+                  <th className={thCls('patient_name')} onClick={() => handleSort('patient_name')}>
+                    <span className="flex items-center gap-1">Cliente <SortIcon active={sortKey === 'patient_name'} dir={sortDir} /></span>
+                  </th>
+                  <th className={thCls('status')} onClick={() => handleSort('status')}>
+                    <span className="flex items-center gap-1">Estado atención <SortIcon active={sortKey === 'status'} dir={sortDir} /></span>
+                  </th>
+                  <th className={thCls('payment_status')} onClick={() => handleSort('payment_status')}>
+                    <span className="flex items-center gap-1">Estado pago <SortIcon active={sortKey === 'payment_status'} dir={sortDir} /></span>
+                  </th>
+                  <th className={thCls('doctor_name')} onClick={() => handleSort('doctor_name')}>
+                    <span className="flex items-center gap-1">Responsable <SortIcon active={sortKey === 'doctor_name'} dir={sortDir} /></span>
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((a) => (
+                  <tr key={a.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-3 py-3.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium text-gray-900 whitespace-nowrap">{a.treatment_name}</span>
+                        <span className={`inline-flex w-fit text-[10px] px-1.5 py-0.5 rounded font-medium border ${
+                          a.appointment_type === 'VALORACION'
+                            ? 'bg-purple-50 text-purple-600 border-purple-100'
+                            : 'bg-blue-50 text-blue-600 border-blue-100'
+                        }`}>
+                          {a.appointment_type === 'VALORACION' ? 'Valoración' : 'Tratamiento'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5 whitespace-nowrap">
+                      <span className="font-medium text-gray-900">{fmt(a.starts_at, 'time')}</span>
+                      <span className="text-gray-400 text-xs ml-1">— {fmt(a.ends_at, 'time')}</span>
+                    </td>
+                    <td className="px-3 py-3.5 max-w-[160px]">
+                      <span className="text-gray-500 text-xs line-clamp-2">{a.notes || '—'}</span>
+                    </td>
+                    <td className="px-3 py-3.5 whitespace-nowrap font-medium text-gray-900">{a.patient_name}</td>
+                    <td className="px-3 py-3.5">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[a.status] ?? 'bg-gray-400'}`} />
+                        {STATUS_LABEL[a.status] ?? a.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3.5">
+                      {a.payment_status ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${PAY_COLORS[a.payment_status] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                            {PAY_LABEL[a.payment_status] ?? a.payment_status}
+                          </span>
+                          {a.payment_amount != null && (
+                            <span className="text-xs text-gray-400 pl-1">
+                              {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(a.payment_amount)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">Sin pago</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3.5 whitespace-nowrap text-gray-600">{a.doctor_name}</td>
+                    <td className="px-3 py-3.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setAtenderApptId(a.id)}
+                          title="Ver / Atender"
+                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {!['COMPLETED','CANCELED','NO_SHOW','EXPIRED'].includes(a.status) && (
+                          <button
+                            onClick={() => setEditApptId(a.id)}
+                            title="Editar"
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {!['COMPLETED','CANCELED','NO_SHOW','EXPIRED','IN_PROGRESS'].includes(a.status) && (
+                          <button
+                            onClick={() => { setCancelApptId(a.id); setCancelError(''); }}
+                            title="Cancelar cita"
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
+                            <XIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {/* Calendar views */}
-      {view === 'month' && (
-        <MonthView year={date.getFullYear()} month={date.getMonth()} appointments={appointments}
-          onDayClick={(d) => { setDate(d); setView('day'); }} onApptClick={setAtenderApptId} today={today} />
-      )}
-      {view === 'week' && (
-        <WeekView weekStart={weekStart} appointments={appointments} onApptClick={setAtenderApptId} today={today} />
-      )}
-      {view === 'day' && (
-        <DayView date={date} appointments={appointments} onApptClick={setAtenderApptId} />
-      )}
 
       <AtenderModal
         appointmentId={atenderApptId}
         onClose={() => setAtenderApptId(null)}
-        onDone={handleDone}
+        onDone={loadData}
       />
 
       {showNewAppt && (
         <NewAppointmentModal
           onClose={() => setShowNewAppt(false)}
-          onCreated={handleDone}
+          onCreated={loadData}
         />
       )}
+
+      {editApptId && (
+        <EditAppointmentModal
+          appointmentId={editApptId}
+          onClose={() => setEditApptId(null)}
+          onSaved={() => { setEditApptId(null); loadData(); }}
+        />
+      )}
+
+      {cancelApptId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setCancelApptId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">¿Cancelar esta cita?</p>
+                <p className="text-sm text-gray-500 mt-0.5">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            {cancelError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{cancelError}</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setCancelApptId(null)} disabled={cancelLoading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50">
+                Volver
+              </button>
+              <button onClick={handleCancel} disabled={cancelLoading}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
+                {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XIcon className="w-4 h-4" />} Confirmar cancelación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── EditAppointmentModal ───────────────────────────────────────────────── */
+
+type EditAppt = {
+  id: number; starts_at: string; ends_at: string; notes: string;
+  doctor_id: number | null; treatment_id: number | null;
+  patient_name: string; treatment_name: string | null; appointment_type: string;
+};
+type DocOpt = { id: number; first_name: string; last_name: string };
+
+function EditAppointmentModal({ appointmentId, onClose, onSaved }: {
+  appointmentId: number; onClose: () => void; onSaved: () => void;
+}) {
+  const [appt, setAppt] = useState<EditAppt | null>(null);
+  const [doctors, setDoctors] = useState<DocOpt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt]     = useState('');
+  const [notes, setNotes]       = useState('');
+  const [doctorId, setDoctorId] = useState<number | ''>('');
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      apiFetch(`/api/appointments/${appointmentId}/`).then(r => r.json()),
+      apiFetch('/api/doctors/').then(r => r.json()),
+    ]).then(([ad, dd]) => {
+      const a: EditAppt = ad.appointment;
+      setAppt(a);
+      const toLocal = (iso: string) => {
+        const d = new Date(iso);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+      setStartsAt(toLocal(a.starts_at));
+      setEndsAt(toLocal(a.ends_at));
+      setNotes(a.notes || '');
+      setDoctorId(a.doctor_id ?? '');
+      setDoctors((dd.doctors || []).filter((d: DocOpt & { is_active?: boolean }) => d.is_active !== false));
+    }).catch(() => setError('No se pudo cargar la cita.'))
+      .finally(() => setLoading(false));
+  }, [appointmentId]);
+
+  const handleSave = async () => {
+    if (!startsAt || !endsAt) { setError('Fecha y hora requeridas.'); return; }
+    setSaving(true); setError('');
+    try {
+      const r = await apiFetch(`/api/appointments/${appointmentId}/`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          starts_at: new Date(startsAt).toISOString(),
+          ends_at:   new Date(endsAt).toISOString(),
+          notes,
+          doctor_id: doctorId || null,
+        }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al guardar');
+      onSaved();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Editar cita</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <XIcon className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>
+        ) : (
+          <div className="px-6 py-5 space-y-4">
+            {appt && (
+              <div className="text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
+                <span className="font-medium text-gray-900">{appt.patient_name}</span>
+                {appt.treatment_name && <span className="ml-2 text-gray-400">· {appt.treatment_name}</span>}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">Inicio</label>
+                <input type="datetime-local" value={startsAt} onChange={e => setStartsAt(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-500">Fin</label>
+                <input type="datetime-local" value={endsAt} onChange={e => setEndsAt(e.target.value)}
+                  className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Responsable</label>
+              <select value={doctorId} onChange={e => setDoctorId(Number(e.target.value) || '')}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900">
+                <option value="">Sin asignar</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>{d.first_name} {d.last_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500">Notas</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none" />
+            </div>
+
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+          </div>
+        )}
+
+        {!loading && (
+          <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />} Guardar cambios
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
