@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import {
-  Ban, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, ChevronUp,
-  ClipboardList, Clock, CreditCard, FileSignature, Loader2, Pencil, Play,
-  Plus, Save, Stethoscope, Trash2, UserPlus, UserX, X,
+  CalendarDays, ChevronDown, ChevronUp, Clock,
+  Loader2, Pencil, Save, Trash2, UserPlus, X,
 } from 'lucide-react';
-import { useAuth } from '../../lib/auth';
 
 type Patient   = { id: number; first_name: string; last_name: string; email: string; phone: string };
 type Treatment = { id: number; name: string; duration_minutes: number; price?: number };
@@ -99,12 +97,6 @@ const PAYMENT_STATUS = {
   REFUNDED: { label: 'Reembolso',  color: 'bg-gray-100 text-gray-500' },
 };
 
-const PAYMENT_METHODS = [
-  { value: 'CASH',     label: 'Efectivo' },
-  { value: 'CARD',     label: 'Tarjeta' },
-  { value: 'TRANSFER', label: 'Transferencia' },
-  { value: 'OTHER',    label: 'Otro' },
-];
 
 function statusInfo(s: string) {
   return STATUS_OPTIONS.find((o) => o.value === s) ?? { label: s, color: 'bg-gray-100 text-gray-600' };
@@ -131,10 +123,7 @@ function toInputTime(iso: string) {
 }
 
 export function AppointmentsAdmin() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients]         = useState<Patient[]>([]);
   const [treatments, setTreatments]     = useState<Treatment[]>([]);
@@ -148,22 +137,11 @@ export function AppointmentsAdmin() {
   const [dateTo, setDateTo]               = useState(() => new Date().toISOString().slice(0, 10));
   const [patientFilter, setPatientFilter] = useState<number | ''>('');
 
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [editing, setEditing]       = useState<FormData | null>(null);
   const [showNewPatient, setShowNewPatient]     = useState(false);
   const [newPatient, setNewPatient]             = useState({ ...EMPTY_NEW_PATIENT });
   const [creatingPatient, setCreatingPatient]   = useState(false);
   const [newPatientError, setNewPatientError]   = useState('');
-
-  const [paymentForm, setPaymentForm]   = useState<Record<number, { amount: string; method: string; status: string; notes: string }>>({});
-  const [savingPay, setSavingPay]       = useState<number | null>(null);
-  const [transiting, setTransiting]     = useState<number | null>(null);
-
-  const [consentApptId, setConsentApptId]   = useState<number | null>(null);
-  const [consentName, setConsentName]       = useState('');
-  const [consentDesc, setConsentDesc]       = useState('');
-  const [savingConsent, setSavingConsent]   = useState(false);
-  const [consentError, setConsentError]     = useState('');
 
   // Auto-open new form when navigated with ?new=1
   useEffect(() => {
@@ -174,13 +152,6 @@ export function AppointmentsAdmin() {
   const [historial, setHistorial]             = useState<Appointment[]>([]);
   const [historialLoading, setHistorialLoading] = useState(false);
   const [historialExpanded, setHistorialExpanded] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {}, 60_000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -295,83 +266,6 @@ export function AppointmentsAdmin() {
     setAppointments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const handleTransition = async (apptId: number, newStatus: string) => {
-    setTransiting(apptId);
-    try {
-      const res = await apiFetch(`/api/appointments/${apptId}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setAppointments((prev) => prev.map((a) => a.id === apptId ? json.appointment : a));
-      }
-    } finally { setTransiting(null); }
-  };
-
-  const handleSavePayment = async (apptId: number) => {
-    const form = paymentForm[apptId];
-    if (!form) return;
-    setSavingPay(apptId);
-    try {
-      const res = await apiFetch(`/api/appointments/${apptId}/payment/`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: parseFloat(form.amount) || 0,
-          method: form.method,
-          status: form.status,
-          notes:  form.notes,
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setAppointments((prev) =>
-          prev.map((a) => a.id === apptId ? { ...a, payment: json.payment } : a)
-        );
-        setPaymentForm((prev) => { const n = { ...prev }; delete n[apptId]; return n; });
-      }
-    } finally { setSavingPay(null); }
-  };
-
-  const initPaymentForm = (a: Appointment) => {
-    setPaymentForm((prev) => ({
-      ...prev,
-      [a.id]: {
-        amount: a.payment ? String(a.payment.amount) : (a.treatment_price ? String(a.treatment_price) : ''),
-        method: a.payment?.method ?? 'CASH',
-        status: a.payment?.status ?? 'PENDING',
-        notes:  a.payment?.notes ?? '',
-      },
-    }));
-  };
-
-  const openConsentModal = (a: Appointment) => {
-    setConsentApptId(a.id);
-    setConsentName(a.patient_name);
-    setConsentDesc(a.treatment_name ?? '');
-    setConsentError('');
-  };
-
-  const handleSaveConsent = async () => {
-    if (!consentApptId) return;
-    if (!consentName.trim()) { setConsentError('El nombre del firmante es obligatorio.'); return; }
-    setSavingConsent(true); setConsentError('');
-    try {
-      const res = await apiFetch(`/api/appointments/${consentApptId}/consent/`, {
-        method: 'POST',
-        body: JSON.stringify({ signed_by_name: consentName, procedure_description: consentDesc }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Error al registrar consentimiento');
-      const data = await res.json();
-      setAppointments((prev) =>
-        prev.map((a) => a.id === consentApptId ? { ...a, consent: data.consent } : a)
-      );
-      setConsentApptId(null);
-    } catch (e: unknown) {
-      setConsentError(e instanceof Error ? e.message : 'Error');
-    } finally { setSavingConsent(false); }
-  };
-
   const handleCreatePatient = async () => {
     if (!newPatient.first_name.trim() || !newPatient.last_name.trim()) {
       setNewPatientError('Nombres y apellidos son obligatorios.');
@@ -398,13 +292,13 @@ export function AppointmentsAdmin() {
   };
 
   /* ── helpers ── */
-  const payBadge = (p: PaymentInfo | null) => {
-    if (!p) return { label: 'Sin pago', cls: 'bg-gray-100 text-gray-400' };
-    const m = PAYMENT_STATUS[p.status as keyof typeof PAYMENT_STATUS];
-    return m ? { label: m.label, cls: m.color } : { label: p.status, cls: 'bg-gray-100 text-gray-500' };
+  const payBadge = (a: Appointment) => {
+    const isValoracion = !a.treatment_id;
+    if (isValoracion) return { label: 'Gratis', cls: 'bg-emerald-50 text-emerald-600' };
+    if (!a.payment) return { label: 'Sin pago', cls: 'bg-gray-100 text-gray-400' };
+    const m = PAYMENT_STATUS[a.payment.status as keyof typeof PAYMENT_STATUS];
+    return m ? { label: m.label, cls: m.color } : { label: a.payment.status, cls: 'bg-gray-100 text-gray-500' };
   };
-
-  const isPast = (iso: string) => new Date(iso).getTime() < Date.now();
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -417,10 +311,6 @@ export function AppointmentsAdmin() {
             <p className="text-sm text-gray-500">{appointments.length} cita{appointments.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
-          <Plus className="w-4 h-4" /> Nueva Cita
-        </button>
       </div>
 
       {/* Filters */}
@@ -509,22 +399,14 @@ export function AppointmentsAdmin() {
             {appointments.map((a) => {
               const { date, time } = toLocal(a.starts_at);
               const st  = statusInfo(a.status);
-              const pay = payBadge(a.payment);
-              const isOpen = expandedId === a.id;
-              const pf    = paymentForm[a.id];
-              const isSavingPay = savingPay === a.id;
-              const isTransiting = transiting === a.id;
-              const pastDue = isPast(a.ends_at);
+              const pay = payBadge(a);
+
+              const isValoracion = !a.treatment_id;
 
               return (
                 <div key={a.id}>
                   {/* Row */}
-                  <div
-                    className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
-                    onClick={() => setExpandedId(isOpen ? null : a.id)}
-                  >
-                    {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-
+                  <div className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50/50 transition-colors">
                     {/* Date/time */}
                     <div className="flex-shrink-0 text-center w-14">
                       <p className="text-xs font-semibold text-gray-900">{date.split('/').slice(0,2).join('/')}</p>
@@ -534,7 +416,11 @@ export function AppointmentsAdmin() {
                     {/* Main info */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{a.patient_name}</p>
-                      <p className="text-xs text-gray-400 truncate">{a.treatment_name ?? 'Sin servicio'}{a.doctor_name ? ` · ${a.doctor_name}` : ''}</p>
+                      <p className="text-xs text-gray-400 truncate">
+                        {isValoracion
+                          ? <span className="text-violet-500 font-medium">Valoración</span>
+                          : <>{a.treatment_name}{a.doctor_name ? ` · ${a.doctor_name}` : ''}</>}
+                      </p>
                     </div>
 
                     {/* Badges — fixed widths matching header */}
@@ -561,8 +447,8 @@ export function AppointmentsAdmin() {
                       </div>
                     </div>
 
-                    {/* Actions - stop propagation */}
-                    <div className="flex gap-1 flex-shrink-0 w-16 justify-end" onClick={(e) => e.stopPropagation()}>
+                    {/* Actions */}
+                    <div className="flex gap-1 flex-shrink-0 w-16 justify-end">
                       {!['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) ? (
                         <button onClick={() => openEdit(a)}
                           className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
@@ -578,212 +464,6 @@ export function AppointmentsAdmin() {
                     </div>
                   </div>
 
-                  {/* Expanded panel */}
-                  {isOpen && (
-                    <div className="px-5 pb-5 bg-gray-50/40 border-t border-gray-100 space-y-4 pt-4">
-
-                      {/* Detail grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
-                          <p className="text-xs text-gray-400 mb-0.5">Paciente</p>
-                          <p className="text-sm font-medium text-gray-900">{a.patient_name}</p>
-                          {a.patient_phone && <p className="text-xs text-gray-400">{a.patient_phone}</p>}
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
-                          <p className="text-xs text-gray-400 mb-0.5">Servicio</p>
-                          <p className="text-sm font-medium text-gray-900">{a.treatment_name ?? '—'}</p>
-                          {a.treatment_price != null && <p className="text-xs text-gray-400">${a.treatment_price.toLocaleString()}</p>}
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
-                          <p className="text-xs text-gray-400 mb-0.5">Médico</p>
-                          <p className="text-sm font-medium text-gray-900">{a.doctor_name ?? '—'}</p>
-                          {a.doctor_email && <p className="text-xs text-gray-400 truncate">{a.doctor_email}</p>}
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
-                          <p className="text-xs text-gray-400 mb-0.5">Fecha y hora</p>
-                          <p className="text-sm font-medium text-gray-900">{date}</p>
-                          <p className="text-xs text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{time}</p>
-                        </div>
-                      </div>
-
-                      {a.notes && (
-                        <div className="bg-white rounded-xl border border-gray-100 px-3 py-2.5">
-                          <p className="text-xs text-gray-400 mb-0.5">Notas</p>
-                          <p className="text-sm text-gray-700 whitespace-pre-line">{a.notes}</p>
-                        </div>
-                      )}
-
-                      {/* Linked modules row */}
-                      <div className="grid grid-cols-3 gap-3">
-
-                        {/* Payment panel */}
-                        <div className={`rounded-xl border px-3 py-3 ${a.payment ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-                              <CreditCard className="w-3.5 h-3.5" /> Pago
-                            </p>
-                            {!pf && (
-                              <button onClick={() => initPaymentForm(a)}
-                                className="text-xs text-blue-600 hover:underline">{a.payment ? 'Editar' : 'Registrar'}</button>
-                            )}
-                          </div>
-                          {a.payment && !pf ? (
-                            <>
-                              <p className="text-sm font-semibold text-gray-900">${a.payment.amount.toLocaleString()}</p>
-                              <p className="text-xs text-gray-400">{PAYMENT_METHODS.find((m) => m.value === a.payment!.method)?.label ?? a.payment.method}</p>
-                              <span className={`mt-1 inline-block text-xs font-medium px-2 py-0.5 rounded-full ${PAYMENT_STATUS[a.payment.status as keyof typeof PAYMENT_STATUS]?.color ?? 'bg-gray-100 text-gray-500'}`}>
-                                {PAYMENT_STATUS[a.payment.status as keyof typeof PAYMENT_STATUS]?.label ?? a.payment.status}
-                              </span>
-                            </>
-                          ) : !pf ? (
-                            <p className="text-xs text-gray-400">Sin pago registrado</p>
-                          ) : null}
-                          {pf && (
-                            <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                              <input type="number" placeholder="Monto" value={pf.amount}
-                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], amount: e.target.value } }))}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-gray-900" />
-                              <select value={pf.method}
-                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], method: e.target.value } }))}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-gray-900">
-                                {PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                              </select>
-                              <select value={pf.status}
-                                onChange={(e) => setPaymentForm((prev) => ({ ...prev, [a.id]: { ...prev[a.id], status: e.target.value } }))}
-                                className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-gray-900">
-                                {Object.entries(PAYMENT_STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
-                              </select>
-                              <div className="flex gap-1 pt-0.5">
-                                <button onClick={() => handleSavePayment(a.id)} disabled={isSavingPay}
-                                  className="flex-1 flex items-center justify-center gap-1 py-1 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50">
-                                  {isSavingPay ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Guardar
-                                </button>
-                                <button onClick={() => setPaymentForm((prev) => { const n = { ...prev }; delete n[a.id]; return n; })}
-                                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Consent panel */}
-                        <div className={`rounded-xl border px-3 py-3 ${a.consent?.signed ? 'bg-white border-gray-100' : 'bg-amber-50/40 border-amber-100'}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-                              <FileSignature className="w-3.5 h-3.5" /> Consentimiento
-                            </p>
-                            {!a.consent?.signed && !['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
-                              <button onClick={(e) => { e.stopPropagation(); openConsentModal(a); }}
-                                className="text-xs text-indigo-600 hover:underline font-medium">Firmar</button>
-                            )}
-                          </div>
-                          {a.consent ? (
-                            <>
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.consent.signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                                {a.consent.signed ? 'Firmado' : 'Pendiente de firma'}
-                              </span>
-                              {a.consent.signed_by_name && <p className="text-xs text-gray-400 mt-1">{a.consent.signed_by_name}</p>}
-                            </>
-                          ) : (
-                            <p className="text-xs text-gray-400">Sin consentimiento</p>
-                          )}
-                          <button onClick={() => navigate('/admin/consents')}
-                            className="mt-2 text-xs text-blue-600 hover:underline block">Ver consentimientos →</button>
-                        </div>
-
-                        {/* Historia clínica panel */}
-                        <div className={`rounded-xl border px-3 py-3 ${a.medical_record_id ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100'}`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-                              <ClipboardList className="w-3.5 h-3.5" /> Historia Clínica
-                            </p>
-                            {a.status === 'IN_PROGRESS' && (
-                              <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/appointments/${a.id}/complete`); }}
-                                className="text-xs text-indigo-600 hover:underline font-medium">
-                                {a.medical_record_id ? 'Editar HC' : 'Crear HC'}
-                              </button>
-                            )}
-                          </div>
-                          {a.medical_record_id ? (
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">HC #{a.medical_record_id}</span>
-                          ) : (
-                            <p className="text-xs text-gray-400">Sin registro clínico</p>
-                          )}
-                          <button onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
-                            className="mt-2 text-xs text-blue-600 hover:underline block">Ver perfil paciente →</button>
-                        </div>
-                      </div>
-
-                      {/* ── Status action buttons ── */}
-                      <div className="flex flex-wrap items-center gap-2 pt-2">
-
-                        {/* PENDING → IN_PROGRESS */}
-                        {a.status === 'PENDING' && (
-                          <button onClick={() => handleTransition(a.id, 'IN_PROGRESS')} disabled={isTransiting}
-                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors">
-                            {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Iniciar Procedimiento
-                          </button>
-                        )}
-
-                        {/* IN_PROGRESS → redirect to complete page */}
-                        {a.status === 'IN_PROGRESS' && (
-                          <button onClick={() => navigate(`/admin/appointments/${a.id}/complete`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors">
-                            <ClipboardList className="w-4 h-4" /> Finalizar — Completar HC
-                          </button>
-                        )}
-
-                        {/* COMPLETED → view patient profile */}
-                        {a.status === 'COMPLETED' && (
-                          <button onClick={() => navigate(`/admin/patients/${a.patient_id}`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
-                            <CheckCircle2 className="w-4 h-4" /> Ver historial
-                          </button>
-                        )}
-
-                        {/* PENDING (past due) → NO_SHOW */}
-                        {a.status === 'PENDING' && pastDue && (
-                          <button onClick={() => {
-                            if (confirm('¿Marcar como no asistió?')) handleTransition(a.id, 'NO_SHOW');
-                          }} disabled={isTransiting}
-                            className="flex items-center gap-2 px-3 py-2 text-amber-700 border border-amber-200 bg-amber-50 text-sm font-medium rounded-xl hover:bg-amber-100 disabled:opacity-50 transition-colors">
-                            <UserX className="w-4 h-4" /> No asistió
-                          </button>
-                        )}
-
-                        {/* Reschedule option for NO_SHOW */}
-                        {a.status === 'NO_SHOW' && (
-                          <button onClick={() => {
-                            setEditing({
-                              patient_id: a.patient_id,
-                              treatment_id: a.treatment_id ?? '',
-                              doctor_id: a.doctor_id ?? '',
-                              date: '', time: '',
-                              duration_minutes: Math.round((new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 60000),
-                              status: 'PENDING',
-                              notes: `Reagendada (original: ${toLocal(a.starts_at).date})`,
-                            });
-                          }}
-                            className="flex items-center gap-2 px-3 py-2 text-blue-700 border border-blue-200 bg-blue-50 text-sm font-medium rounded-xl hover:bg-blue-100 transition-colors">
-                            <CalendarPlus className="w-4 h-4" /> Reagendar
-                          </button>
-                        )}
-
-                        {/* CANCEL — admin only, before COMPLETED */}
-                        {isAdmin && !['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(a.status) && (
-                          <button onClick={() => {
-                            if (confirm('¿Cancelar esta cita?')) handleTransition(a.id, 'CANCELED');
-                          }} disabled={isTransiting}
-                            className="flex items-center gap-2 px-3 py-2 text-red-600 border border-red-200 bg-red-50 text-sm font-medium rounded-xl hover:bg-red-100 disabled:opacity-50 transition-colors">
-                            <Ban className="w-4 h-4" /> Cancelar
-                          </button>
-                        )}
-
-                        <span className={`ml-auto text-xs font-medium px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -981,49 +661,6 @@ export function AppointmentsAdmin() {
         </div>
       )}
 
-      {/* Consent signing modal */}
-      {consentApptId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setConsentApptId(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileSignature className="w-5 h-5 text-indigo-600" /> Firmar Consentimiento
-              </h2>
-              <button onClick={() => setConsentApptId(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              {consentError && (
-                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{consentError}</div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del firmante <span className="text-red-500">*</span></label>
-                <input type="text" value={consentName} onChange={(e) => setConsentName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Procedimiento</label>
-                <input type="text" value={consentDesc} onChange={(e) => setConsentDesc(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  placeholder="Descripción del procedimiento" />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => setConsentApptId(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                Cancelar
-              </button>
-              <button onClick={handleSaveConsent} disabled={savingConsent}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                {savingConsent ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSignature className="w-4 h-4" />}
-                Firmar Consentimiento
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
