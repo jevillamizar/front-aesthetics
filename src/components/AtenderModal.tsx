@@ -30,8 +30,6 @@ type ApptDetail = {
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   PENDING:     { label: 'Pendiente',   color: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
-  SCHEDULED:   { label: 'Programada',  color: 'bg-blue-50 text-blue-700 border border-blue-200' },
-  CONFIRMED:   { label: 'Confirmada',  color: 'bg-green-50 text-green-700 border border-green-200' },
   IN_PROGRESS: { label: 'En curso',    color: 'bg-indigo-50 text-indigo-700 border border-indigo-200' },
   COMPLETED:   { label: 'Completada',  color: 'bg-gray-100 text-gray-600 border border-gray-200' },
   CANCELED:    { label: 'Cancelada',   color: 'bg-red-50 text-red-600 border border-red-200' },
@@ -46,7 +44,7 @@ const PAY_METHODS = [
   { value: 'OTHER', label: 'Otro' },
 ];
 
-const ACTIVE_STATUSES = ['PENDING', 'SCHEDULED', 'CONFIRMED'];
+const ACTIVE_STATUSES = ['PENDING', 'IN_PROGRESS'];
 
 function fmt(iso: string, type: 'date' | 'time') {
   const d = new Date(iso);

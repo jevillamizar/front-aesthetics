@@ -45,12 +45,12 @@ function fmt(iso: string, type: 'date' | 'time') {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  SCHEDULED:   { label: 'Programada',  color: 'bg-blue-50 text-blue-700' },
-  CONFIRMED:   { label: 'Confirmada',  color: 'bg-green-50 text-green-700' },
+  PENDING:     { label: 'Pendiente',   color: 'bg-amber-50 text-amber-700' },
   IN_PROGRESS: { label: 'En curso',    color: 'bg-indigo-50 text-indigo-700' },
   COMPLETED:   { label: 'Completada',  color: 'bg-gray-100 text-gray-600' },
   CANCELED:    { label: 'Cancelada',   color: 'bg-red-50 text-red-600' },
   NO_SHOW:     { label: 'No asistió',  color: 'bg-amber-50 text-amber-700' },
+  EXPIRED:     { label: 'Vencida',     color: 'bg-orange-50 text-orange-600' },
 };
 
 /* ── Component ─────────────────────────────────────────────────────── */
@@ -114,8 +114,8 @@ export function AppointmentComplete() {
     try {
       let mrId = appt.medical_record_id;
 
-      // If CONFIRMED, transition to IN_PROGRESS first (auto-creates MedicalRecord)
-      if (appt.status === 'CONFIRMED') {
+      // If PENDING, transition to IN_PROGRESS first (auto-creates MedicalRecord)
+      if (appt.status === 'PENDING') {
         const r = await apiFetch(`/api/appointments/${appt.id}/`, {
           method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
         });
@@ -159,8 +159,8 @@ export function AppointmentComplete() {
     try {
       let mrId = appt.medical_record_id;
 
-      // If CONFIRMED, transition to IN_PROGRESS first
-      if (appt.status === 'CONFIRMED') {
+      // If PENDING, transition to IN_PROGRESS first
+      if (appt.status === 'PENDING') {
         const r = await apiFetch(`/api/appointments/${appt.id}/`, {
           method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
         });
@@ -216,7 +216,7 @@ export function AppointmentComplete() {
   }
 
   const isReadOnly = ['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(appt.status);
-  const canComplete = ['CONFIRMED', 'IN_PROGRESS'].includes(appt.status);
+  const canComplete = ['PENDING', 'IN_PROGRESS'].includes(appt.status);
   const st = STATUS_LABELS[appt.status] ?? { label: appt.status, color: 'bg-gray-100 text-gray-600' };
 
   return (

@@ -27,24 +27,24 @@ type View = 'month' | 'week' | 'day';
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED:   'bg-blue-100 text-blue-800 border-blue-200',
-  CONFIRMED:   'bg-green-100 text-green-800 border-green-200',
+  PENDING:     'bg-amber-100 text-amber-800 border-amber-200',
   IN_PROGRESS: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   COMPLETED:   'bg-gray-100 text-gray-600 border-gray-200',
   CANCELED:    'bg-red-100 text-red-600 border-red-200',
   NO_SHOW:     'bg-amber-100 text-amber-700 border-amber-200',
+  EXPIRED:     'bg-orange-100 text-orange-700 border-orange-200',
 };
 const STATUS_DOT: Record<string, string> = {
-  SCHEDULED:   'bg-blue-500',
-  CONFIRMED:   'bg-green-500',
+  PENDING:     'bg-amber-400',
   IN_PROGRESS: 'bg-indigo-500',
   COMPLETED:   'bg-gray-400',
   CANCELED:    'bg-red-400',
   NO_SHOW:     'bg-amber-400',
+  EXPIRED:     'bg-orange-400',
 };
 const STATUS_LABEL: Record<string, string> = {
-  SCHEDULED: 'Programada', CONFIRMED: 'Confirmada', IN_PROGRESS: 'En curso',
-  COMPLETED: 'Completada', CANCELED: 'Cancelada', NO_SHOW: 'No asistió',
+  PENDING: 'Pendiente', IN_PROGRESS: 'En curso',
+  COMPLETED: 'Completada', CANCELED: 'Cancelada', NO_SHOW: 'No asistió', EXPIRED: 'Vencida',
 };
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];

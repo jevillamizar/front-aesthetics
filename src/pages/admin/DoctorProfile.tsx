@@ -1,7 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { ArrowLeft, Loader2, Pencil, Save, Shield, Stethoscope, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil, Save, Shield, Stethoscope, Trash2, Upload, X } from 'lucide-react';
+
+async function compressImage(file: File, maxWidthPx = 800, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidthPx / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
 
 type Doctor = {
   id: number;
@@ -22,6 +42,8 @@ type Doctor = {
   certifying_entity: string;
   professional_seal: string;
   notes: string;
+  bio: string;
+  photo_url: string;
 };
 
 type EditForm = {
@@ -43,6 +65,9 @@ type EditForm = {
   certifying_entity: string;
   professional_seal: string;
   notes: string;
+  bio: string;
+  photo_url: string;
+  photoFile?: File;
 };
 
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
@@ -96,29 +121,60 @@ export function DoctorProfile() {
       rethus_number: doctor.rethus_number, rethus_status: doctor.rethus_status,
       certifying_entity: doctor.certifying_entity,
       professional_seal: doctor.professional_seal, notes: doctor.notes,
+      bio: doctor.bio || '', photo_url: doctor.photo_url || '',
     });
   };
 
   const handleSave = async () => {
     if (!editing || !doctor) return;
     if (!editing.email) { setError('El email es obligatorio.'); return; }
+    if (editing.bio && editing.bio.length < 100) { setError('La bio debe tener al menos 100 caracteres.'); return; }
+    if (editing.bio && editing.bio.length > 500) { setError('La bio no puede superar los 500 caracteres.'); return; }
     setSaving(true);
     setError('');
     try {
-      const body: Record<string, unknown> = {
-        first_name: editing.first_name, last_name: editing.last_name,
-        email: editing.email, is_active: editing.is_active,
-        document_type: editing.document_type, document_number: editing.document_number,
-        date_of_birth: editing.date_of_birth || null,
-        phone: editing.phone, profession: editing.profession,
-        specialty: editing.specialty, university: editing.university,
-        graduation_year: editing.graduation_year ? Number(editing.graduation_year) : null,
-        rethus_number: editing.rethus_number, rethus_status: editing.rethus_status,
-        certifying_entity: editing.certifying_entity,
-        professional_seal: editing.professional_seal, notes: editing.notes,
-      };
-      if (editing.password) body.password = editing.password;
-      const res = await apiFetch(`/api/doctors/${doctor.id}/`, { method: 'PUT', body: JSON.stringify(body) });
+      let res: Response;
+      if (editing.photoFile) {
+        const compressedPhoto = await compressImage(editing.photoFile);
+        const form = new FormData();
+        form.append('first_name', editing.first_name);
+        form.append('last_name', editing.last_name);
+        form.append('email', editing.email);
+        form.append('is_active', String(editing.is_active));
+        form.append('document_type', editing.document_type);
+        form.append('document_number', editing.document_number);
+        form.append('date_of_birth', editing.date_of_birth || '');
+        form.append('phone', editing.phone);
+        form.append('profession', editing.profession);
+        form.append('specialty', editing.specialty);
+        form.append('university', editing.university);
+        form.append('graduation_year', editing.graduation_year || '');
+        form.append('rethus_number', editing.rethus_number);
+        form.append('rethus_status', editing.rethus_status);
+        form.append('certifying_entity', editing.certifying_entity);
+        form.append('professional_seal', editing.professional_seal);
+        form.append('notes', editing.notes);
+        form.append('bio', editing.bio);
+        if (editing.password) form.append('password', editing.password);
+        form.append('photo', compressedPhoto);
+        res = await apiFetch(`/api/doctors/${doctor.id}/`, { method: 'PUT', body: form, headers: {} });
+      } else {
+        const body: Record<string, unknown> = {
+          first_name: editing.first_name, last_name: editing.last_name,
+          email: editing.email, is_active: editing.is_active,
+          document_type: editing.document_type, document_number: editing.document_number,
+          date_of_birth: editing.date_of_birth || null,
+          phone: editing.phone, profession: editing.profession,
+          specialty: editing.specialty, university: editing.university,
+          graduation_year: editing.graduation_year ? Number(editing.graduation_year) : null,
+          rethus_number: editing.rethus_number, rethus_status: editing.rethus_status,
+          certifying_entity: editing.certifying_entity,
+          professional_seal: editing.professional_seal, notes: editing.notes,
+          bio: editing.bio,
+        };
+        if (editing.password) body.password = editing.password;
+        res = await apiFetch(`/api/doctors/${doctor.id}/`, { method: 'PUT', body: JSON.stringify(body) });
+      }
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.detail || 'Error al guardar');
@@ -163,8 +219,10 @@ export function DoctorProfile() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
-              <Stethoscope className="w-7 h-7 text-blue-600" />
+            <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0">
+              {doctor.photo_url
+                ? <img src={doctor.photo_url} alt={fullName} className="w-full h-full object-cover" />
+                : <Stethoscope className="w-7 h-7 text-blue-600" />}
             </div>
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">{fullName}</h1>
@@ -242,6 +300,21 @@ export function DoctorProfile() {
             {doctor.notes && <InfoRow label="Notas internas" value={doctor.notes} />}
           </div>
         </div>
+
+        {/* Perfil público */}
+        {(doctor.bio || doctor.photo_url) && (
+          <div className="border-t border-gray-50 pt-5">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Perfil público (Landing Page)</h2>
+            <div className="flex gap-5 items-start">
+              {doctor.photo_url && (
+                <img src={doctor.photo_url} alt={fullName} className="w-20 h-20 rounded-xl object-cover flex-shrink-0 border border-gray-100" />
+              )}
+              {doctor.bio && (
+                <p className="text-sm text-gray-700 leading-relaxed">{doctor.bio}</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Edit Modal ───────────────────────────────────────────────────── */}
@@ -257,7 +330,6 @@ export function DoctorProfile() {
             </div>
 
             <div className="px-6 py-5 space-y-6">
-              {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
 
               {/* Identificación */}
               <div>
@@ -314,6 +386,67 @@ export function DoctorProfile() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Año de graduación</label>
                     <input type="number" value={editing.graduation_year} onChange={(e) => setEditing({ ...editing, graduation_year: e.target.value })} className={inp} placeholder="2015" min="1970" max="2099" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Perfil público (Landing Page) */}
+              <div>
+                <p className={sec}>Perfil público (Landing Page)</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Foto del médico</label>
+                    <div className="space-y-2">
+                      {(editing.photoFile ? URL.createObjectURL(editing.photoFile) : editing.photo_url) && (
+                        <div className="relative inline-block">
+                          <img
+                            src={editing.photoFile ? URL.createObjectURL(editing.photoFile) : editing.photo_url}
+                            alt="preview"
+                            className="h-24 w-24 rounded-xl object-cover border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEditing({ ...editing, photoFile: undefined, photo_url: '' })}
+                            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                        <Upload className="w-3.5 h-3.5" />
+                        Subir foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            if (f.size > 15 * 1024 * 1024) { setError('La imagen no puede superar 15 MB'); return; }
+                            setEditing({ ...editing, photoFile: f });
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Sobre mí <span className="text-xs text-gray-400 font-normal">(visible en landing page)</span></label>
+                      <span className={`text-xs font-medium ${editing.bio.length > 500 ? 'text-red-500' : editing.bio.length >= 100 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {editing.bio.length}/500
+                      </span>
+                    </div>
+                    <textarea
+                      value={editing.bio}
+                      onChange={(e) => setEditing({ ...editing, bio: e.target.value.slice(0, 500) })}
+                      rows={4}
+                      className={inp}
+                      placeholder="Describe brevemente tu experiencia, especialidad y enfoque (mínimo 100 caracteres)…"
+                    />
+                    {editing.bio.length > 0 && editing.bio.length < 100 && (
+                      <p className="text-xs text-amber-600 mt-1">Mínimo 100 caracteres ({100 - editing.bio.length} restantes)</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -381,13 +514,16 @@ export function DoctorProfile() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+            <div className="px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
+              {error && <div className="mb-3 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
+              <div className="flex justify-end gap-3">
               <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
               <button onClick={handleSave} disabled={saving}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Guardar cambios
               </button>
+              </div>
             </div>
           </div>
         </div>

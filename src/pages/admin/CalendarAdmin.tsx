@@ -22,19 +22,21 @@ type Doctor = { id: number; first_name: string; last_name: string; email: string
 type View = 'month' | 'week' | 'day';
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: 'bg-blue-100 text-blue-800 border-blue-200',
-  CONFIRMED:  'bg-green-100 text-green-800 border-green-200',
-  COMPLETED:  'bg-gray-100 text-gray-600 border-gray-200',
-  CANCELED:   'bg-red-100 text-red-600 border-red-200',
-  NO_SHOW:    'bg-amber-100 text-amber-700 border-amber-200',
+  PENDING:     'bg-amber-100 text-amber-800 border-amber-200',
+  IN_PROGRESS: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  COMPLETED:   'bg-gray-100 text-gray-600 border-gray-200',
+  CANCELED:    'bg-red-100 text-red-600 border-red-200',
+  NO_SHOW:     'bg-amber-100 text-amber-700 border-amber-200',
+  EXPIRED:     'bg-orange-100 text-orange-700 border-orange-200',
 };
 
 const STATUS_DOT: Record<string, string> = {
-  SCHEDULED: 'bg-blue-500',
-  CONFIRMED:  'bg-green-500',
-  COMPLETED:  'bg-gray-400',
-  CANCELED:   'bg-red-400',
-  NO_SHOW:    'bg-amber-400',
+  PENDING:     'bg-amber-400',
+  IN_PROGRESS: 'bg-indigo-500',
+  COMPLETED:   'bg-gray-400',
+  CANCELED:    'bg-red-400',
+  NO_SHOW:     'bg-amber-400',
+  EXPIRED:     'bg-orange-400',
 };
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -247,7 +249,7 @@ function DayView({ date, appointments, onApptClick }: {
                 {a.treatment_name && <p className="text-sm text-gray-500 truncate">{a.treatment_name}</p>}
               </div>
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full border flex-shrink-0 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                {a.status === 'SCHEDULED' ? 'Programada' : a.status === 'CONFIRMED' ? 'Confirmada' : a.status === 'COMPLETED' ? 'Completada' : a.status === 'CANCELED' ? 'Cancelada' : 'No asistió'}
+                {a.status === 'PENDING' ? 'Pendiente' : a.status === 'IN_PROGRESS' ? 'En curso' : a.status === 'COMPLETED' ? 'Completada' : a.status === 'CANCELED' ? 'Cancelada' : a.status === 'EXPIRED' ? 'Vencida' : 'No asistió'}
               </span>
             </div>
           ))}
@@ -391,7 +393,7 @@ export function CalendarAdmin() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mb-4">
-        {Object.entries({ SCHEDULED: 'Programada', CONFIRMED: 'Confirmada', COMPLETED: 'Completada', CANCELED: 'Cancelada', NO_SHOW: 'No asistió' }).map(([k, label]) => (
+        {Object.entries({ PENDING: 'Pendiente', IN_PROGRESS: 'En curso', COMPLETED: 'Completada', CANCELED: 'Cancelada', NO_SHOW: 'No asistió', EXPIRED: 'Vencida' }).map(([k, label]) => (
           <div key={k} className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${STATUS_DOT[k]}`} />
             <span className="text-xs text-gray-500">{label}</span>

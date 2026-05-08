@@ -76,6 +76,26 @@ const emptyForm: FormData = {
   photo_url: '',
 };
 
+async function compressImage(file: File, maxWidthPx = 800, quality = 0.82): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidthPx / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 export function DoctorsAdmin() {
   const navigate = useNavigate();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -127,6 +147,7 @@ export function DoctorsAdmin() {
       const url = isNew ? '/api/doctors/' : `/api/doctors/${editing.id}/`;
       let res: Response;
       if (editing.photoFile) {
+        const compressedPhoto = await compressImage(editing.photoFile);
         const form = new FormData();
         form.append('first_name', editing.first_name);
         form.append('last_name', editing.last_name);
@@ -147,7 +168,7 @@ export function DoctorsAdmin() {
         form.append('notes', editing.notes);
         form.append('bio', editing.bio);
         if (editing.password) form.append('password', editing.password);
-        form.append('photo', editing.photoFile);
+        form.append('photo', compressedPhoto);
         res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: form, headers: {} });
       } else {
         const body: Record<string, unknown> = {
@@ -305,7 +326,6 @@ export function DoctorsAdmin() {
             </div>
 
             <div className="px-6 py-5 space-y-6">
-              {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
 
               {/* Identificación */}
               <div>
@@ -397,9 +417,14 @@ export function DoctorsAdmin() {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const f = e.target.files?.[0];
-                            if (f) setEditing({ ...editing, photoFile: f });
+                            if (!f) return;
+                            if (f.size > 15 * 1024 * 1024) {
+                              setError('La imagen no puede superar 15 MB');
+                              return;
+                            }
+                            setEditing({ ...editing, photoFile: f });
                           }}
                         />
                       </label>
@@ -494,13 +519,16 @@ export function DoctorsAdmin() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+            <div className="px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
+              {error && <div className="mb-3 px-4 py-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
+              <div className="flex justify-end gap-3">
               <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
               <button onClick={handleSave} disabled={saving}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {editing.id ? 'Guardar cambios' : 'Crear médico'}
               </button>
+              </div>
             </div>
           </div>
         </div>

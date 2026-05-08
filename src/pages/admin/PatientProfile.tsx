@@ -106,15 +106,16 @@ type Appointment = {
 
 const SEX_LABEL: Record<string, string> = { M: 'Masculino', F: 'Femenino', O: 'Otro' };
 const STATUS_LABEL: Record<string, string> = {
-  SCHEDULED: 'Programada', CONFIRMED: 'Confirmada', COMPLETED: 'Completada',
-  CANCELED: 'Cancelada', NO_SHOW: 'No asistió',
+  PENDING: 'Pendiente', IN_PROGRESS: 'En curso', COMPLETED: 'Completada',
+  CANCELED: 'Cancelada', NO_SHOW: 'No asistió', EXPIRED: 'Vencida',
 };
 const STATUS_CLASS: Record<string, string> = {
-  SCHEDULED: 'bg-blue-50 text-blue-700 border-blue-200',
-  CONFIRMED:  'bg-green-50 text-green-700 border-green-200',
-  COMPLETED:  'bg-gray-100 text-gray-600 border-gray-200',
-  CANCELED:   'bg-red-50 text-red-600 border-red-200',
-  NO_SHOW:    'bg-amber-50 text-amber-700 border-amber-200',
+  PENDING:     'bg-amber-50 text-amber-700 border-amber-200',
+  IN_PROGRESS: 'bg-violet-50 text-violet-700 border-violet-200',
+  COMPLETED:   'bg-gray-100 text-gray-600 border-gray-200',
+  CANCELED:    'bg-red-50 text-red-600 border-red-200',
+  NO_SHOW:     'bg-amber-50 text-amber-700 border-amber-200',
+  EXPIRED:     'bg-orange-50 text-orange-600 border-orange-200',
 };
 
 function formatDate(iso: string) {

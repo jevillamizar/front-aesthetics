@@ -84,13 +84,12 @@ const empty: FormData = {
 };
 
 const STATUS_OPTIONS = [
-  { value: 'PENDING',     label: 'Pendiente',  color: 'bg-amber-50 text-amber-700',   dot: 'bg-amber-400' },
-  { value: 'SCHEDULED',   label: 'Programada', color: 'bg-blue-50 text-blue-700',     dot: 'bg-blue-400' },
-  { value: 'CONFIRMED',   label: 'Confirmada', color: 'bg-green-50 text-green-700',   dot: 'bg-green-500' },
-  { value: 'IN_PROGRESS', label: 'En curso',   color: 'bg-violet-50 text-violet-700', dot: 'bg-violet-400' },
+  { value: 'PENDING',     label: 'Pendiente',  color: 'bg-amber-50 text-amber-700',     dot: 'bg-amber-400' },
+  { value: 'IN_PROGRESS', label: 'En curso',   color: 'bg-violet-50 text-violet-700',   dot: 'bg-violet-400' },
   { value: 'COMPLETED',   label: 'Completada', color: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-400' },
-  { value: 'CANCELED',    label: 'Cancelada',  color: 'bg-red-50 text-red-600',       dot: 'bg-red-400' },
-  { value: 'NO_SHOW',     label: 'No asistió', color: 'bg-gray-100 text-gray-500',    dot: 'bg-gray-400' },
+  { value: 'CANCELED',    label: 'Cancelada',  color: 'bg-red-50 text-red-600',         dot: 'bg-red-400' },
+  { value: 'NO_SHOW',     label: 'No asistió', color: 'bg-gray-100 text-gray-500',      dot: 'bg-gray-400' },
+  { value: 'EXPIRED',     label: 'Vencida',    color: 'bg-orange-50 text-orange-600',   dot: 'bg-orange-400' },
 ];
 
 const PAYMENT_STATUS = {
@@ -699,7 +698,7 @@ export function AppointmentsAdmin() {
                             <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
                               <ClipboardList className="w-3.5 h-3.5" /> Historia Clínica
                             </p>
-                            {['CONFIRMED', 'IN_PROGRESS'].includes(a.status) && (
+                            {a.status === 'IN_PROGRESS' && (
                               <button onClick={(e) => { e.stopPropagation(); navigate(`/admin/appointments/${a.id}/complete`); }}
                                 className="text-xs text-indigo-600 hover:underline font-medium">
                                 {a.medical_record_id ? 'Editar HC' : 'Crear HC'}
@@ -719,62 +718,13 @@ export function AppointmentsAdmin() {
                       {/* ── Status action buttons ── */}
                       <div className="flex flex-wrap items-center gap-2 pt-2">
 
-                        {/* PENDING → SCHEDULED */}
+                        {/* PENDING → IN_PROGRESS */}
                         {a.status === 'PENDING' && (
-                          <button onClick={() => handleTransition(a.id, 'SCHEDULED')} disabled={isTransiting}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors">
-                            {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Programar
+                          <button onClick={() => handleTransition(a.id, 'IN_PROGRESS')} disabled={isTransiting}
+                            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors">
+                            {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Iniciar Procedimiento
                           </button>
                         )}
-
-                        {/* SCHEDULED → CONFIRMED (requires payment + consent + doctor) */}
-                        {a.status === 'SCHEDULED' && (() => {
-                          const hasPay = a.payment && ['PAID', 'PARTIAL'].includes(a.payment.status);
-                          const hasCon = a.consent?.signed;
-                          const hasDoc = !!a.doctor_id;
-                          const canConfirm = hasPay && hasCon && hasDoc;
-                          return (
-                            <>
-                              {!hasPay && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta pago</span>}
-                              {!hasCon && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta consentimiento</span>}
-                              {!hasDoc && <span className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">⚠ Falta médico</span>}
-                              <button onClick={() => handleTransition(a.id, 'CONFIRMED')} disabled={isTransiting || !canConfirm}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
-                                title={!canConfirm ? 'Registre pago, consentimiento y médico primero' : ''}>
-                                {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Confirmar
-                              </button>
-                            </>
-                          );
-                        })()}
-
-                        {/* CONFIRMED → IN_PROGRESS (only within time window) */}
-                        {a.status === 'CONFIRMED' && (() => {
-                          const now = Date.now();
-                          const windowStart = new Date(a.starts_at).getTime() - 15 * 60 * 1000;
-                          const windowEnd = new Date(a.ends_at).getTime();
-                          const inWindow = now >= windowStart && now <= windowEnd;
-                          const tooEarly = now < windowStart;
-                          const minsLeft = tooEarly ? Math.ceil((windowStart - now) / 60000) : 0;
-                          return (
-                            <>
-                              {tooEarly && (
-                                <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-                                  Disponible en {minsLeft} min
-                                </span>
-                              )}
-                              {!tooEarly && !inWindow && (
-                                <span className="text-xs text-red-600 bg-red-50 px-2.5 py-1 rounded-full">
-                                  Ventana expirada
-                                </span>
-                              )}
-                              <button onClick={() => handleTransition(a.id, 'IN_PROGRESS')} disabled={isTransiting || !inWindow}
-                                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
-                                title={!inWindow ? (tooEarly ? `Puede iniciar desde 15 min antes (faltan ${minsLeft} min)` : 'Ventana expirada') : ''}>
-                                {isTransiting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />} Iniciar Procedimiento
-                              </button>
-                            </>
-                          );
-                        })()}
 
                         {/* IN_PROGRESS → redirect to complete page */}
                         {a.status === 'IN_PROGRESS' && (
@@ -792,12 +742,10 @@ export function AppointmentsAdmin() {
                           </button>
                         )}
 
-                        {/* NO_SHOW from SCHEDULED (past due) or CONFIRMED */}
-                        {((a.status === 'SCHEDULED' && pastDue) || a.status === 'CONFIRMED') && (
+                        {/* PENDING (past due) → NO_SHOW */}
+                        {a.status === 'PENDING' && pastDue && (
                           <button onClick={() => {
-                            if (confirm('¿Marcar como no asistió?' + (a.status === 'CONFIRMED' ? ' Podrá reagendar después.' : ''))) {
-                              handleTransition(a.id, 'NO_SHOW');
-                            }
+                            if (confirm('¿Marcar como no asistió?')) handleTransition(a.id, 'NO_SHOW');
                           }} disabled={isTransiting}
                             className="flex items-center gap-2 px-3 py-2 text-amber-700 border border-amber-200 bg-amber-50 text-sm font-medium rounded-xl hover:bg-amber-100 disabled:opacity-50 transition-colors">
                             <UserX className="w-4 h-4" /> No asistió
