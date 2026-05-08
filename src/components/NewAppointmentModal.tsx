@@ -81,7 +81,8 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
 
   /* step 2 — fecha/slot */
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const [selDate, setSelDate]   = useState<Date>(() => addDays(today, 1));
+  const [selDate, setSelDate]   = useState<Date>(() => today);
+  const [weekStart, setWeekStart] = useState<Date>(() => today);
   const [slots, setSlots]       = useState<Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selSlot, setSelSlot]   = useState<Slot | null>(null);
@@ -380,20 +381,41 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
 
               {/* Date navigation */}
               <div>
-                <div className="flex items-center justify-between mb-3">
+                {/* Input de fecha */}
+                <div className="mb-3">
+                  <input
+                    type="date"
+                    value={toDateStr(selDate)}
+                    min={toDateStr(today)}
+                    onChange={e => {
+                      const parsed = new Date(e.target.value + 'T00:00:00');
+                      if (!isNaN(parsed.getTime()) && parsed >= today) {
+                        setSelDate(parsed);
+                        setWeekStart(parsed);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                </div>
+
+                {/* Semana con flechas */}
+                <div className="flex items-center justify-between mb-2">
                   <button type="button"
-                    onClick={() => { const d = addDays(selDate, -1); if (d >= today) setSelDate(d); }}
-                    disabled={addDays(selDate, -1) < today}
+                    onClick={() => {
+                      const newStart = addDays(weekStart, -7);
+                      const clamped = newStart < today ? today : newStart;
+                      setWeekStart(clamped);
+                      if (toDateStr(selDate) < toDateStr(clamped)) setSelDate(clamped);
+                    }}
+                    disabled={addDays(weekStart, -7) < today}
                     className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors">
                     <ChevronLeft className="w-4 h-4 text-gray-600" />
                   </button>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {DAY_NAMES[selDate.getDay()]}, {selDate.getDate()} de {MONTH_NAMES[selDate.getMonth()]}
-                    </p>
-                    <p className="text-xs text-gray-400">{selDate.getFullYear()}</p>
-                  </div>
-                  <button type="button" onClick={() => setSelDate(addDays(selDate, 1))}
+                  <p className="text-xs text-gray-400 font-medium">
+                    {MONTH_NAMES[weekStart.getMonth()]} {weekStart.getFullYear()}
+                  </p>
+                  <button type="button"
+                    onClick={() => setWeekStart(addDays(weekStart, 7))}
                     className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
                     <ChevronRight className="w-4 h-4 text-gray-600" />
                   </button>
@@ -401,12 +423,15 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
 
                 {/* Day chips */}
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {Array.from({ length: 7 }, (_, i) => addDays(today, i + 1)).map(d => {
+                  {Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map(d => {
                     const active = toDateStr(d) === toDateStr(selDate);
+                    const past = d < today;
                     return (
-                      <button key={d.toISOString()} type="button" onClick={() => setSelDate(d)}
+                      <button key={d.toISOString()} type="button"
+                        onClick={() => { if (!past) setSelDate(d); }}
+                        disabled={past}
                         className={`flex flex-col items-center px-3 py-2 rounded-xl text-xs shrink-0 border transition-colors
-                          ${active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 hover:border-gray-400 text-gray-600'}`}>
+                          ${active ? 'border-gray-900 bg-gray-900 text-white' : past ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200 hover:border-gray-400 text-gray-600'}`}>
                         <span className="font-medium">{DAY_NAMES[d.getDay()]}</span>
                         <span>{d.getDate()}</span>
                       </button>
