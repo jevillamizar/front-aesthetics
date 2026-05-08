@@ -20,6 +20,7 @@ import { PatientProfile } from './pages/admin/PatientProfile';
 import { RevenueAdmin } from './pages/admin/RevenueAdmin';
 import { TreatmentsAdmin } from './pages/admin/TreatmentsAdmin';
 import { Settings } from './pages/admin/Settings';
+import { AvailabilityPage } from './pages/AvailabilityPage';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -28,6 +29,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           {/* Public landing page */}
           <Route path="/" element={<App />} />
+          <Route path="/disponibilidad" element={<AvailabilityPage />} />
 
           {/* Auth */}
           <Route path="/login" element={<Login />} />

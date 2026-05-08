@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Palette, Building2, Bell, Scissors, UserCircle } from 'lucide-react';
+import { Palette, Building2, Bell, Scissors, UserCircle, CalendarDays } from 'lucide-react';
 import { LandingEditor } from './LandingEditor';
 import { TreatmentsAdmin } from './TreatmentsAdmin';
 import { AccountSettings } from './AccountSettings';
 import { ClinicSettings } from './ClinicSettings';
+import { GoogleCalendarSettings } from './GoogleCalendarSettings';
 
-type Tab = 'account' | 'clinic' | 'landing' | 'treatments' | 'notifications';
+type Tab = 'account' | 'clinic' | 'landing' | 'treatments' | 'gcal' | 'notifications';
 
 const tabs: { id: Tab; label: string; icon: typeof Palette }[] = [
   { id: 'account', label: 'Mi Cuenta', icon: UserCircle },
   { id: 'clinic', label: 'Datos de la Clínica', icon: Building2 },
   { id: 'landing', label: 'Landing Page', icon: Palette },
   { id: 'treatments', label: 'Procedimientos', icon: Scissors },
+  { id: 'gcal', label: 'Google Calendar', icon: CalendarDays },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
 ];
 
@@ -58,6 +60,7 @@ export function Settings() {
         {activeTab === 'clinic' && <ClinicSettings />}
         {activeTab === 'landing' && <LandingEditor />}
         {activeTab === 'treatments' && <TreatmentsAdmin />}
+        {activeTab === 'gcal' && <GoogleCalendarSettings />}
         {activeTab === 'notifications' && <NotificationSettings />}
       </div>
     </div>
