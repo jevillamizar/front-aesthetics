@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import {
   ArrowLeft, Calendar, CheckCircle, Clock, ClipboardList,
-  Loader2, Mail, Phone, Stethoscope, User,
+  Camera, Loader2, Mail, Phone, Stethoscope, Trash2, Upload, User,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -34,6 +34,17 @@ const MR_FIELDS: { key: string; label: string; rows?: number; required?: boolean
 ];
 
 type MRForm = Record<string, string>;
+
+type PhotoState = {
+  url: string;       // existing URL from backend
+  file: File | null; // new file to upload
+  preview: string;   // local preview URL
+  uploading: boolean;
+};
+
+function initPhoto(url: string): PhotoState {
+  return { url, file: null, preview: '', uploading: false };
+}
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
@@ -69,6 +80,31 @@ export function AppointmentComplete() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [mrId, setMrId] = useState<number | null>(null);
+
+  const [photoBefore, setPhotoBefore] = useState<PhotoState>(initPhoto(''));
+  const [photoAfter, setPhotoAfter]   = useState<PhotoState>(initPhoto(''));
+  const beforeRef = useRef<HTMLInputElement>(null);
+  const afterRef  = useRef<HTMLInputElement>(null);
+
+  // Photo upload handler
+  const handlePhotoUpload = useCallback(async (which: 'before' | 'after', file: File, currentMrId: number) => {
+    const setState = which === 'before' ? setPhotoBefore : setPhotoAfter;
+    const preview = URL.createObjectURL(file);
+    setState(s => ({ ...s, file, preview, uploading: true }));
+    try {
+      const fd = new FormData();
+      fd.append(which === 'before' ? 'photo_before' : 'photo_after', file);
+      const res = await apiFetch(`/api/medical-records/${currentMrId}/`, { method: 'PUT', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error al subir foto');
+      const url = which === 'before' ? data.record.photo_before_url : data.record.photo_after_url;
+      setState({ url, file: null, preview: '', uploading: false });
+    } catch (e: unknown) {
+      setState(s => ({ ...s, uploading: false }));
+      setSaveError(e instanceof Error ? e.message : 'Error al subir foto');
+    }
+  }, []);
 
   // Load appointment
   useEffect(() => {
@@ -101,6 +137,19 @@ export function AppointmentComplete() {
       .finally(() => setLoadingRec(false));
   }, [appt?.medical_record_id]);
 
+  // Load medical record for photos when mrId is known
+  useEffect(() => {
+    if (!appt?.medical_record_id) return;
+    setMrId(appt.medical_record_id);
+    apiFetch(`/api/medical-records/${appt.medical_record_id}/`)
+      .then(r => r.json())
+      .then(d => {
+        setPhotoBefore(initPhoto(d.record?.photo_before_url || ''));
+        setPhotoAfter(initPhoto(d.record?.photo_after_url  || ''));
+      })
+      .catch(() => {});
+  }, [appt?.medical_record_id]);
+
   const set = (key: string) => (e: React.ChangeEvent<HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
 
@@ -122,6 +171,7 @@ export function AppointmentComplete() {
         const rData = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(rData.detail || 'Error al iniciar consulta');
         mrId = rData.appointment?.medical_record_id ?? mrId;
+        if (mrId) setMrId(mrId);
       }
 
       // If still no mrId, re-fetch
@@ -167,6 +217,7 @@ export function AppointmentComplete() {
         const rData = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(rData.detail || 'Error al iniciar consulta');
         mrId = rData.appointment?.medical_record_id ?? mrId;
+        if (mrId) setMrId(mrId);
         // Update local state
         setAppt(prev => prev ? { ...prev, status: 'IN_PROGRESS', medical_record_id: mrId ?? prev.medical_record_id } : prev);
       }
@@ -274,6 +325,71 @@ export function AppointmentComplete() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Before / After Photos */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <Camera className="w-5 h-5 text-violet-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Fotos Antes / Después</h2>
+        </div>
+        <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {(['before', 'after'] as const).map(which => {
+            const state = which === 'before' ? photoBefore : photoAfter;
+            const ref   = which === 'before' ? beforeRef   : afterRef;
+            const label = which === 'before' ? 'Antes' : 'Después';
+            const displayUrl = state.preview || state.url;
+            return (
+              <div key={which} className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-gray-700">{label}</p>
+                {displayUrl ? (
+                  <div className="relative group">
+                    <img src={displayUrl} alt={label}
+                      className="w-full h-48 object-cover rounded-xl border border-gray-200" />
+                    {state.uploading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-xl">
+                        <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
+                      </div>
+                    )}
+                    {!isReadOnly && !state.uploading && (
+                      <button
+                        onClick={() => ref.current?.click()}
+                        className="absolute bottom-2 right-2 p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Upload className="w-4 h-4 text-gray-600" />
+                      </button>
+                    )}
+                    {!isReadOnly && !state.uploading && (
+                      <button
+                        onClick={() => { which === 'before' ? setPhotoBefore(initPhoto('')) : setPhotoAfter(initPhoto('')); }}
+                        className="absolute top-2 right-2 p-1.5 bg-white border border-red-200 rounded-lg shadow-sm hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isReadOnly || state.uploading || !mrId}
+                    onClick={() => ref.current?.click()}
+                    className="flex flex-col items-center justify-center h-48 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-violet-300 hover:text-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    {state.uploading
+                      ? <Loader2 className="w-6 h-6 animate-spin" />
+                      : <><Upload className="w-6 h-6 mb-2" /><span className="text-xs">Subir foto {label.toLowerCase()}</span></>}
+                  </button>
+                )}
+                <input ref={ref} type="file" accept="image/*" className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file && mrId) handlePhotoUpload(which, file, mrId);
+                  }} />
+              </div>
+            );
+          })}
+        </div>
+        {!mrId && !isReadOnly && (
+          <p className="px-5 pb-4 text-xs text-amber-600">Inicia el procedimiento para poder subir fotos.</p>
+        )}
       </div>
 
       {/* Medical Record Form */}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { Loader2, Pencil, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Pencil, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
 
 type Patient = {
   id: number;
@@ -93,6 +93,8 @@ export function PatientsAdmin() {
   const [editing, setEditing] = useState<FormData | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<Patient | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async (q = '') => {
     setLoading(true);
@@ -173,10 +175,16 @@ export function PatientsAdmin() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('¿Eliminar este paciente? Esta acción no se puede deshacer.')) return;
-    await apiFetch(`/api/patients/${id}/`, { method: 'DELETE' });
-    await load(search);
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/patients/${confirmDelete.id}/`, { method: 'DELETE' });
+      setConfirmDelete(null);
+      await load(search);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); load(search); };
@@ -251,7 +259,7 @@ export function PatientsAdmin() {
                           className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(p.id)}
+                        <button onClick={() => setConfirmDelete(p)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -402,6 +410,44 @@ export function PatientsAdmin() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {editing.id ? 'Guardar cambios' : 'Crear paciente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => !deleting && setConfirmDelete(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-gray-900">Eliminar paciente</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Estás a punto de eliminar a <span className="font-medium text-gray-900">{confirmDelete.first_name} {confirmDelete.last_name}</span>.
+                  Esta acción <span className="font-semibold text-red-600">no se puede deshacer</span> y borrará permanentemente:
+                </p>
+                <ul className="mt-3 space-y-1.5 text-sm text-gray-700">
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Todas las citas agendadas</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Historias clínicas y procedimientos</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Consentimientos informados</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />Todos los datos del paciente</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setConfirmDelete(null)} disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Sí, eliminar todo
               </button>
             </div>
           </div>

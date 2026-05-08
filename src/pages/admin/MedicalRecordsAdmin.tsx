@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
 import {
-  ClipboardList, Loader2, Pencil, Plus, Save, Search, Trash2, X, ChevronDown, ChevronUp,
+  ChevronRight, ClipboardList, FileText, Loader2, Minus, Pencil, Plus,
+  RotateCcw, Save, Search, Trash2, X,
 } from 'lucide-react';
 
 type Patient  = { id: number; first_name: string; last_name: string };
@@ -43,6 +44,8 @@ type MedicalRecord = {
   informed_consent: string;
   consent_signed: boolean;
   notes: string;
+  photo_before_url: string;
+  photo_after_url: string;
   created_at: string;
   treatment_items: TreatmentItem[];
 };
@@ -109,7 +112,27 @@ export function MedicalRecordsAdmin() {
   const [editing, setEditing]     = useState<FormData | null>(null);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
+  const [lightbox, setLightbox] = useState<{ images: string[]; idx: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+
+  const resetZoom = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setLightbox(null); resetZoom(); }
+      if (e.key === '+' || e.key === '=') setZoom(z => Math.min(z + 0.5, 5));
+      if (e.key === '-') setZoom(z => { const nz = Math.max(z - 0.5, 1); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; });
+      if (e.key === 'ArrowRight' && zoom === 1) setLightbox(lb => lb && lb.idx < lb.images.length - 1 ? { ...lb, idx: lb.idx + 1 } : lb);
+      if (e.key === 'ArrowLeft'  && zoom === 1) setLightbox(lb => lb && lb.idx > 0 ? { ...lb, idx: lb.idx - 1 } : lb);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightbox, zoom]);
 
   const loadMeta = async () => {
     const [pRes, dRes, tRes] = await Promise.all([
@@ -300,104 +323,34 @@ export function MedicalRecordsAdmin() {
             <p className="text-gray-400 text-sm">No hay registros médicos</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-100">
             {records.map((r) => {
-              const isOpen = expandedId === r.id;
               const total = r.treatment_items.reduce((s, it) => s + it.price * it.quantity, 0);
+              const hasPhotos = !!(r.photo_before_url || r.photo_after_url);
               return (
-                <div key={r.id}>
-                  <div className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors">
-                    <button onClick={() => setExpandedId(isOpen ? null : r.id)} className="flex-1 flex items-center gap-4 text-left">
-                      {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900">{r.patient_name}</p>
-                        <p className="text-sm text-gray-500 truncate">
-                          {r.chief_complaint || r.diagnosis || 'Sin motivo de consulta'}
-                        </p>
-                      </div>
-                      <div className="hidden sm:flex flex-col items-end gap-0.5">
-                        <span className="text-sm text-gray-500">{r.doctor_name}</span>
-                        <span className="text-xs text-gray-400">{fmt(r.created_at)}</span>
-                      </div>
-                      {total > 0 && (
-                        <span className="text-sm font-semibold text-gray-900 flex-shrink-0">{fmtCurrency(total)}</span>
-                      )}
-                    </button>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                <div key={r.id} className="flex items-center gap-2 px-5 py-3.5 hover:bg-gray-50 transition-colors group">
+                  <button onClick={() => setSelectedRecord(r)} className="flex items-center gap-3 flex-1 text-left min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-100 transition-colors">
+                      <FileText className="w-4 h-4 text-violet-500" />
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{r.patient_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{r.chief_complaint || r.diagnosis || 'Sin motivo de consulta'}</p>
+                    </div>
+                    <div className="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
+                      <span className="text-sm text-gray-500">{r.doctor_name}</span>
+                      <span className="text-xs text-gray-400">{fmt(r.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {hasPhotos && <span className="text-xs text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">Fotos</span>}
+                      {total > 0 && <span className="text-sm font-semibold text-gray-900">{fmtCurrency(total)}</span>}
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
+                  </button>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div>
-
-                  {isOpen && (
-                    <div className="px-5 pb-5 bg-gray-50/40 border-t border-gray-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mb-4">
-                        {r.chief_complaint && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Motivo de consulta</p><p className="text-sm text-gray-800">{r.chief_complaint}</p></div>}
-                        {r.current_illness && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Enfermedad actual</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.current_illness}</p></div>}
-                        {(r.personal_history||r.surgical_history||r.allergic_history||r.pharmacological_history||r.family_history) && (
-                          <div className="sm:col-span-2">
-                            <p className="text-xs font-medium text-gray-500 uppercase mb-2">Antecedentes</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {r.personal_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Personales</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.personal_history}</p></div>}
-                              {r.surgical_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Quirúrgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.surgical_history}</p></div>}
-                              {r.allergic_history       && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Alérgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.allergic_history}</p></div>}
-                              {r.pharmacological_history && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Farmacológicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.pharmacological_history}</p></div>}
-                              {r.family_history         && <div className="bg-white border border-gray-100 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Familiares</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.family_history}</p></div>}
-                            </div>
-                          </div>
-                        )}
-                        {r.physical_exam  && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Examen físico</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.physical_exam}</p></div>}
-                        {r.diagnosis      && <div><p className="text-xs font-medium text-gray-500 uppercase mb-1">Diagnóstico</p><p className="text-sm text-gray-800">{r.diagnosis}</p></div>}
-                        {r.treatment_plan && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Plan de procedimiento</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.treatment_plan}</p></div>}
-                        {r.evolution      && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Evolución</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.evolution}</p></div>}
-                        {r.notes          && <div className="sm:col-span-2"><p className="text-xs font-medium text-gray-500 uppercase mb-1">Notas</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.notes}</p></div>}
-                        {(r.informed_consent || r.consent_signed) && (
-                          <div className="sm:col-span-2">
-                            <p className="text-xs font-medium text-gray-500 uppercase mb-1">Consentimiento informado</p>
-                            {r.informed_consent && <p className="text-sm text-gray-800 whitespace-pre-line mb-1">{r.informed_consent}</p>}
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.consent_signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                              {r.consent_signed ? '✓ Firmado' : 'Pendiente de firma'}
-                            </span>
-                          </div>
-                        )}
-                        {/* Médico responsable */}
-                        <div className="sm:col-span-2 bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
-                          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Médico responsable</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            <div><p className="text-xs text-gray-400">Nombre</p><p className="text-sm font-medium text-gray-800">{r.doctor_name || '—'}</p></div>
-                            {r.doctor_profession && <div><p className="text-xs text-gray-400">Profesión</p><p className="text-sm text-gray-800">{r.doctor_profession}{r.doctor_specialty ? ` · ${r.doctor_specialty}` : ''}</p></div>}
-                            {r.doctor_rethus_number && (
-                              <div>
-                                <p className="text-xs text-gray-400">ReTHUS</p>
-                                <p className="text-sm text-gray-800">{r.doctor_rethus_number}
-                                  <span className={`ml-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                                    r.doctor_rethus_status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                                  }`}>{r.doctor_rethus_status === 'ACTIVE' ? 'Activo' : 'Suspendido'}</span>
-                                </p>
-                              </div>
-                            )}
-                            {r.doctor_professional_seal && <div className="sm:col-span-2"><p className="text-xs text-gray-400">Sello profesional</p><p className="text-sm font-medium text-gray-800">{r.doctor_professional_seal}</p></div>}
-                          </div>
-                        </div>
-                      </div>
-                      {r.treatment_items.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 uppercase mb-2">Procedimientos realizados</p>
-                          <div className="space-y-1">
-                            {r.treatment_items.map((it, i) => (
-                              <div key={i} className="flex justify-between text-sm text-gray-700 bg-white border border-gray-100 px-3 py-2 rounded-lg">
-                                <span>{it.treatment_name} × {it.quantity}</span>
-                                <span className="font-medium">{fmtCurrency(it.price * it.quantity)}</span>
-                              </div>
-                            ))}
-                            <div className="flex justify-between text-sm font-semibold text-gray-900 px-3 py-1">
-                              <span>Total</span><span>{fmtCurrency(total)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -405,7 +358,168 @@ export function MedicalRecordsAdmin() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* View Modal */}
+      {selectedRecord && (() => {
+        const r = selectedRecord;
+        const total = r.treatment_items.reduce((s, it) => s + it.price * it.quantity, 0);
+        const photoArr = [r.photo_before_url, r.photo_after_url].filter(Boolean) as string[];
+        return (
+          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSelectedRecord(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+              onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+                <div>
+                  <p className="font-semibold text-gray-900">{r.patient_name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{r.chief_complaint || r.diagnosis || 'Sin motivo'} · {r.doctor_name} · {fmt(r.created_at)}</p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => { setSelectedRecord(null); openEdit(r); }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                    <Pencil className="w-3 h-3" /> Editar
+                  </button>
+                  <button onClick={() => setSelectedRecord(null)}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="overflow-y-auto px-6 py-5 space-y-5">
+
+                {/* Fotos */}
+                {photoArr.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fotos Antes / Después</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {photoArr.map((url, i) => (
+                        <div key={url}>
+                          <p className="text-xs text-gray-500 mb-1">{i === 0 && photoArr.length === 2 ? 'Antes' : i === 1 ? 'Después' : r.photo_before_url ? 'Antes' : 'Después'}</p>
+                          <button type="button" onClick={() => setLightbox({ images: photoArr, idx: i })}
+                            className="w-full block rounded-xl overflow-hidden border border-gray-200 hover:border-violet-400 hover:shadow-md transition-all group">
+                            <img src={url} alt="foto" className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-200" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Clinical fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {r.chief_complaint && <div><p className="text-xs text-gray-400 uppercase font-medium mb-1">Motivo de consulta</p><p className="text-sm text-gray-800">{r.chief_complaint}</p></div>}
+                  {r.diagnosis && <div><p className="text-xs text-gray-400 uppercase font-medium mb-1">Diagnóstico</p><p className="text-sm text-gray-800">{r.diagnosis}</p></div>}
+                  {r.current_illness && <div className="sm:col-span-2"><p className="text-xs text-gray-400 uppercase font-medium mb-1">Enfermedad actual</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.current_illness}</p></div>}
+                  {(r.personal_history||r.surgical_history||r.allergic_history||r.pharmacological_history||r.family_history) && (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-gray-400 uppercase font-medium mb-2">Antecedentes</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {r.personal_history        && <div className="bg-gray-50 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Personales</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.personal_history}</p></div>}
+                        {r.surgical_history        && <div className="bg-gray-50 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Quirúrgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.surgical_history}</p></div>}
+                        {r.allergic_history        && <div className="bg-gray-50 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Alérgicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.allergic_history}</p></div>}
+                        {r.pharmacological_history && <div className="bg-gray-50 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Farmacológicos</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.pharmacological_history}</p></div>}
+                        {r.family_history          && <div className="bg-gray-50 rounded-lg px-3 py-2"><p className="text-xs text-gray-400 mb-0.5">Familiares</p><p className="text-sm text-gray-700 whitespace-pre-line">{r.family_history}</p></div>}
+                      </div>
+                    </div>
+                  )}
+                  {r.physical_exam   && <div className="sm:col-span-2"><p className="text-xs text-gray-400 uppercase font-medium mb-1">Examen físico</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.physical_exam}</p></div>}
+                  {r.treatment_plan  && <div className="sm:col-span-2"><p className="text-xs text-gray-400 uppercase font-medium mb-1">Plan de procedimiento</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.treatment_plan}</p></div>}
+                  {r.evolution       && <div className="sm:col-span-2"><p className="text-xs text-gray-400 uppercase font-medium mb-1">Evolución</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.evolution}</p></div>}
+                  {r.notes           && <div className="sm:col-span-2"><p className="text-xs text-gray-400 uppercase font-medium mb-1">Notas</p><p className="text-sm text-gray-800 whitespace-pre-line">{r.notes}</p></div>}
+                  {(r.informed_consent || r.consent_signed) && (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-gray-400 uppercase font-medium mb-1">Consentimiento informado</p>
+                      {r.informed_consent && <p className="text-sm text-gray-800 whitespace-pre-line mb-1">{r.informed_consent}</p>}
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.consent_signed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {r.consent_signed ? '✓ Firmado' : 'Pendiente de firma'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Procedimientos */}
+                {r.treatment_items.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Procedimientos realizados</p>
+                    <div className="space-y-1">
+                      {r.treatment_items.map((it, i) => (
+                        <div key={i} className="flex justify-between text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">
+                          <span>{it.treatment_name} × {it.quantity}</span>
+                          <span className="font-medium">{fmtCurrency(it.price * it.quantity)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-sm font-semibold text-gray-900 px-3 py-1">
+                        <span>Total</span><span>{fmtCurrency(total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Médico responsable */}
+                <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Médico responsable</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div><p className="text-xs text-gray-400">Nombre</p><p className="text-sm font-medium text-gray-800">{r.doctor_name || '—'}</p></div>
+                    {r.doctor_profession && <div><p className="text-xs text-gray-400">Profesión</p><p className="text-sm text-gray-800">{r.doctor_profession}{r.doctor_specialty ? ` · ${r.doctor_specialty}` : ''}</p></div>}
+                    {r.doctor_rethus_number && (
+                      <div>
+                        <p className="text-xs text-gray-400">ReTHUS</p>
+                        <p className="text-sm text-gray-800">{r.doctor_rethus_number}
+                          <span className={`ml-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                            r.doctor_rethus_status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                          }`}>{r.doctor_rethus_status === 'ACTIVE' ? 'Activo' : 'Suspendido'}</span>
+                        </p>
+                      </div>
+                    )}
+                    {r.doctor_professional_seal && <div className="col-span-2"><p className="text-xs text-gray-400">Sello profesional</p><p className="text-sm font-medium text-gray-800">{r.doctor_professional_seal}</p></div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm overflow-hidden"
+          onClick={() => { if (zoom === 1) { setLightbox(null); resetZoom(); } }}
+          onWheel={e => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 0.25 : -0.25;
+            setZoom(z => { const nz = Math.min(Math.max(z + delta, 1), 5); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; });
+          }}>
+          {/* Toolbar */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 rounded-full px-3 py-1.5 z-10"
+            onClick={e => e.stopPropagation()}>
+            <button onClick={() => setZoom(z => { const nz = Math.max(z - 0.5, 1); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; })} disabled={zoom <= 1}
+              className="p-1 rounded-full text-white hover:bg-white/20 disabled:opacity-30"><Minus className="w-4 h-4" /></button>
+            <span className="text-white text-xs font-medium w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.min(z + 0.5, 5))} disabled={zoom >= 5}
+              className="p-1 rounded-full text-white hover:bg-white/20 disabled:opacity-30"><Plus className="w-4 h-4" /></button>
+            {zoom > 1 && <button onClick={resetZoom} className="p-1 rounded-full text-white hover:bg-white/20 ml-1"><RotateCcw className="w-4 h-4" /></button>}
+          </div>
+          <button className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white z-10"
+            onClick={() => { setLightbox(null); resetZoom(); }}><X className="w-5 h-5" /></button>
+          <img
+            src={lightbox.images[lightbox.idx]} alt="foto" draggable={false}
+            onDoubleClick={e => { e.stopPropagation(); zoom > 1 ? resetZoom() : setZoom(2.5); }}
+            onMouseDown={e => { if (zoom <= 1) return; e.preventDefault(); dragRef.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y }; }}
+            onMouseMove={e => { if (!dragRef.current) return; setPan({ x: dragRef.current.panX + (e.clientX - dragRef.current.startX), y: dragRef.current.panY + (e.clientY - dragRef.current.startY) }); }}
+            onMouseUp={() => { dragRef.current = null; }}
+            onMouseLeave={() => { dragRef.current = null; }}
+            onClick={e => e.stopPropagation()}
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transition: dragRef.current ? 'none' : 'transform 0.15s ease', cursor: zoom > 1 ? 'grab' : 'zoom-in', userSelect: 'none' }}
+            className="max-h-[85vh] max-w-[90vw] rounded-xl shadow-2xl object-contain" />
+          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs pointer-events-none">
+            {zoom === 1 ? 'Doble click o scroll para hacer zoom' : 'Arrastra para mover · Doble click para restablecer'}
+          </p>
+        </div>
+      )}
+
+      {/* Edit Modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
