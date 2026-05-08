@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { Button } from './ui/Button';
 
 export type AboutBullet = {
@@ -162,7 +162,156 @@ function BulletCard({ bullet, index }: { bullet: AboutBullet; index: number }) {
   );
 }
 
+type TeamDoctor = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  profession: string;
+  specialty: string;
+  bio: string;
+  photo_url: string;
+};
+
+function DoctorCard({ doc }: { doc: TeamDoctor }) {
+  const [expanded, setExpanded] = useState(false);
+  const name = `${doc.first_name} ${doc.last_name}`.trim();
+  const BIO_PREVIEW = 160;
+  const isLong = doc.bio.length > BIO_PREVIEW;
+  const displayBio = expanded || !isLong ? doc.bio : `${doc.bio.slice(0, BIO_PREVIEW)}…`;
+
+  return (
+    <div className="flex flex-col rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200"
+      style={{ backgroundColor: 'var(--secondary, #F5F5F3)' }}>
+      {/* Photo */}
+      <div className="w-full aspect-square overflow-hidden" style={{ backgroundColor: 'var(--secondary, #F5F5F3)' }}>
+        {doc.photo_url ? (
+          <img src={doc.photo_url} alt={name} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-5xl font-bold opacity-20" style={{ color: 'var(--primary, #8B9E8B)' }}>
+              {(doc.first_name?.[0] || '?').toUpperCase()}
+            </span>
+          </div>
+        )}
+      </div>
+      {/* Info */}
+      <div className="p-5 flex flex-col flex-1">
+        <h3 className="text-base font-semibold leading-snug mb-0.5" style={{ color: 'var(--text, #2D2D2D)' }}>{name || '—'}</h3>
+        {(doc.profession || doc.specialty) && (
+          <p className="text-xs font-medium mb-3" style={{ color: 'var(--primary, #8B9E8B)' }}>
+            {[doc.profession, doc.specialty].filter(Boolean).join(' · ')}
+          </p>
+        )}
+        {doc.bio && (
+          <div className="mt-auto">
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted, #6B6B6B)' }}>{displayBio}</p>
+            {isLong && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="mt-1 text-xs font-medium underline underline-offset-2 transition-colors"
+                style={{ color: 'var(--primary, #8B9E8B)' }}
+              >
+                {expanded ? 'Ver menos' : 'Ver más'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TeamModal({ onClose }: { onClose: () => void }) {
+  const [team, setTeam] = useState<TeamDoctor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const apiBase = (import.meta.env.VITE_API_BASE ?? '').trim() ||
+      `${window.location.protocol}//${window.location.hostname}:8000`;
+    fetch(`${apiBase.replace(/\/$/, '')}/public/team/`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Error al cargar el equipo');
+        const json = await res.json();
+        setTeam(json.team || []);
+      })
+      .catch((e) => setError(e.message || 'Error'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
+      style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 16 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text, #2D2D2D)' }}>Nuestro Equipo</h2>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted, #6B6B6B)' }}>Conoce a los profesionales detrás de cada tratamiento</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
+          >
+            <X className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-6 flex-1">
+          {loading && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--primary, #8B9E8B)' }} />
+            </div>
+          )}
+          {!loading && error && (
+            <p className="text-center text-sm text-red-500 py-10">{error}</p>
+          )}
+          {!loading && !error && team.length === 0 && (
+            <p className="text-center text-sm py-10" style={{ color: 'var(--text-muted, #6B6B6B)' }}>
+              No hay médicos disponibles en este momento.
+            </p>
+          )}
+          {!loading && !error && team.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {team.map((doc) => <DoctorCard key={doc.id} doc={doc} />)}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export function About({ landing }: AboutProps) {
+  const [teamOpen, setTeamOpen] = useState(false);
+
   const title       = landing?.about_title?.trim()       || defaultTitle;
   const subtitle    = landing?.about_subtitle?.trim()    || defaultSubtitle;
   const description = landing?.about_description?.trim() || defaultDescription;
@@ -275,10 +424,14 @@ export function About({ landing }: AboutProps) {
               </div>
             )}
 
-            <Button variant="outline" size="lg">Conoce a nuestro equipo</Button>
+            <Button variant="outline" size="lg" onClick={() => setTeamOpen(true)}>Conoce a nuestro equipo</Button>
           </motion.div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {teamOpen && <TeamModal onClose={() => setTeamOpen(false)} />}
+      </AnimatePresence>
     </section>
   );
 }

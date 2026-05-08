@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { Check, ClipboardCopy, Loader2, Pencil, Plus, Save, Search, Stethoscope, Trash2, X } from 'lucide-react';
+import { Check, ClipboardCopy, Loader2, Pencil, Plus, Save, Search, Stethoscope, Trash2, Upload, X } from 'lucide-react';
 
 type Credentials = { email: string; password: string };
 
@@ -24,6 +24,8 @@ type Doctor = {
   certifying_entity: string;
   professional_seal: string;
   notes: string;
+  bio: string;
+  photo_url: string;
 };
 
 type FormData = {
@@ -46,6 +48,9 @@ type FormData = {
   certifying_entity: string;
   professional_seal: string;
   notes: string;
+  bio: string;
+  photo_url: string;
+  photoFile?: File;
 };
 
 const emptyForm: FormData = {
@@ -67,6 +72,8 @@ const emptyForm: FormData = {
   certifying_entity: '',
   professional_seal: '',
   notes: '',
+  bio: '',
+  photo_url: '',
 };
 
 export function DoctorsAdmin() {
@@ -105,32 +112,60 @@ export function DoctorsAdmin() {
       university: d.university, graduation_year: d.graduation_year ? String(d.graduation_year) : '',
       rethus_number: d.rethus_number, rethus_status: d.rethus_status,
       certifying_entity: d.certifying_entity, professional_seal: d.professional_seal,
-      notes: d.notes,
+      notes: d.notes, bio: d.bio || '', photo_url: d.photo_url || '',
     });
 
   const handleSave = async () => {
     if (!editing) return;
     if (!editing.email) { setError('El email es obligatorio.'); return; }
+    if (editing.bio && editing.bio.length < 100) { setError('La bio debe tener al menos 100 caracteres.'); return; }
+    if (editing.bio && editing.bio.length > 500) { setError('La bio no puede superar los 500 caracteres.'); return; }
     setSaving(true);
     setError('');
     try {
-      const body: Record<string, unknown> = {
-        first_name: editing.first_name, last_name: editing.last_name,
-        email: editing.email, is_active: editing.is_active,
-        document_type: editing.document_type, document_number: editing.document_number,
-        date_of_birth: editing.date_of_birth || null,
-        phone: editing.phone, profession: editing.profession,
-        specialty: editing.specialty, university: editing.university,
-        graduation_year: editing.graduation_year ? Number(editing.graduation_year) : null,
-        rethus_number: editing.rethus_number, rethus_status: editing.rethus_status,
-        certifying_entity: editing.certifying_entity,
-        professional_seal: editing.professional_seal, notes: editing.notes,
-      };
-      if (editing.password) body.password = editing.password;
-
       const isNew = !editing.id;
       const url = isNew ? '/api/doctors/' : `/api/doctors/${editing.id}/`;
-      const res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
+      let res: Response;
+      if (editing.photoFile) {
+        const form = new FormData();
+        form.append('first_name', editing.first_name);
+        form.append('last_name', editing.last_name);
+        form.append('email', editing.email);
+        form.append('is_active', String(editing.is_active));
+        form.append('document_type', editing.document_type);
+        form.append('document_number', editing.document_number);
+        form.append('date_of_birth', editing.date_of_birth || '');
+        form.append('phone', editing.phone);
+        form.append('profession', editing.profession);
+        form.append('specialty', editing.specialty);
+        form.append('university', editing.university);
+        form.append('graduation_year', editing.graduation_year || '');
+        form.append('rethus_number', editing.rethus_number);
+        form.append('rethus_status', editing.rethus_status);
+        form.append('certifying_entity', editing.certifying_entity);
+        form.append('professional_seal', editing.professional_seal);
+        form.append('notes', editing.notes);
+        form.append('bio', editing.bio);
+        if (editing.password) form.append('password', editing.password);
+        form.append('photo', editing.photoFile);
+        res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: form, headers: {} });
+      } else {
+        const body: Record<string, unknown> = {
+          first_name: editing.first_name, last_name: editing.last_name,
+          email: editing.email, is_active: editing.is_active,
+          document_type: editing.document_type, document_number: editing.document_number,
+          date_of_birth: editing.date_of_birth || null,
+          phone: editing.phone, profession: editing.profession,
+          specialty: editing.specialty, university: editing.university,
+          graduation_year: editing.graduation_year ? Number(editing.graduation_year) : null,
+          rethus_number: editing.rethus_number, rethus_status: editing.rethus_status,
+          certifying_entity: editing.certifying_entity,
+          professional_seal: editing.professional_seal, notes: editing.notes,
+          bio: editing.bio,
+        };
+        if (editing.password) body.password = editing.password;
+        res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
+      }
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.detail || 'Error al guardar');
@@ -327,6 +362,67 @@ export function DoctorsAdmin() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Año de graduación</label>
                     <input type="number" value={editing.graduation_year} onChange={(e) => setEditing({ ...editing, graduation_year: e.target.value })} className={inp} placeholder="2015" min="1970" max="2099" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Perfil público (Landing Page) */}
+              <div>
+                <p className={sec}>Perfil público (Landing Page)</p>
+                <div className="space-y-3">
+                  {/* Foto */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Foto del médico</label>
+                    <div className="space-y-2">
+                      {(editing.photoFile ? URL.createObjectURL(editing.photoFile) : editing.photo_url) && (
+                        <div className="relative inline-block">
+                          <img
+                            src={editing.photoFile ? URL.createObjectURL(editing.photoFile) : editing.photo_url}
+                            alt="preview"
+                            className="h-24 w-24 rounded-xl object-cover border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEditing({ ...editing, photoFile: undefined, photo_url: '' })}
+                            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                        <Upload className="w-3.5 h-3.5" />
+                        Subir foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setEditing({ ...editing, photoFile: f });
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  {/* Bio */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Sobre mí <span className="text-xs text-gray-400 font-normal">(visible en landing page)</span></label>
+                      <span className={`text-xs font-medium ${editing.bio.length > 500 ? 'text-red-500' : editing.bio.length >= 100 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {editing.bio.length}/500
+                      </span>
+                    </div>
+                    <textarea
+                      value={editing.bio}
+                      onChange={(e) => setEditing({ ...editing, bio: e.target.value.slice(0, 500) })}
+                      rows={4}
+                      className={inp}
+                      placeholder="Describe brevemente tu experiencia, especialidad y enfoque (mínimo 100 caracteres)…"
+                    />
+                    {editing.bio.length > 0 && editing.bio.length < 100 && (
+                      <p className="text-xs text-amber-600 mt-1">Mínimo 100 caracteres ({100 - editing.bio.length} restantes)</p>
+                    )}
                   </div>
                 </div>
               </div>
