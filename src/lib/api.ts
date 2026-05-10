@@ -2,7 +2,7 @@ const TOKEN_KEY = 'auth_token';
 
 export function getApiBase(): string {
   const env = (import.meta.env.VITE_API_BASE ?? '').trim();
-  return env || `${window.location.protocol}//${window.location.hostname}:8000`;
+  return env || window.location.origin;
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
