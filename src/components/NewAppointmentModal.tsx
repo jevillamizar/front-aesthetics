@@ -93,7 +93,7 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
   const [done, setDone]     = useState(false);
 
   const apiBase = ((import.meta.env.VITE_API_BASE ?? '').trim() ||
-    `${window.location.protocol}//${window.location.hostname}:8000`).replace(/\/$/, '');
+    window.location.origin).replace(/\/$/, '');
 
   /* Load meta */
   useEffect(() => {

@@ -23,7 +23,7 @@ const AuthContext = createContext<AuthState | null>(null);
 
 function getApiBase() {
   const env = (import.meta.env.VITE_API_BASE ?? '').trim();
-  return env || `${window.location.protocol}//${window.location.hostname}:8000`;
+  return env || window.location.origin;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

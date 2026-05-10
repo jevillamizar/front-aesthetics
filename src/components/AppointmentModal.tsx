@@ -56,7 +56,7 @@ export function AppointmentModal({ open, onClose }: AppointmentModalProps) {
 
   const apiBase =
     (import.meta.env.VITE_API_BASE ?? '').trim() ||
-    `${window.location.protocol}//${window.location.hostname}:8000`;
+    window.location.origin;
   const availabilityEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/availability/`;
   const leadsEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/leads/`;
 

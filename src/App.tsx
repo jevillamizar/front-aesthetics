@@ -54,7 +54,7 @@ export function App() {
 
   const apiBase =
     (import.meta.env.VITE_API_BASE ?? '').trim() ||
-    `${window.location.protocol}//${window.location.hostname}:8000`;
+    window.location.origin;
   const landingEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/landing/`;
 
   useEffect(() => {

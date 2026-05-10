@@ -229,7 +229,7 @@ function TeamModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const apiBase = (import.meta.env.VITE_API_BASE ?? '').trim() ||
-      `${window.location.protocol}//${window.location.hostname}:8000`;
+      window.location.origin;
     fetch(`${apiBase.replace(/\/$/, '')}/public/team/`)
       .then(async (res) => {
         if (!res.ok) throw new Error('Error al cargar el equipo');
