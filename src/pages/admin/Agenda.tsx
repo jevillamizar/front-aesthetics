@@ -87,42 +87,61 @@ function MonthView({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Day headers */}
       <div className="grid grid-cols-7 border-b border-gray-100">
         {DAYS_SHORT.map((d) => (
-          <div key={d} className="py-2.5 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">{d}</div>
+          <div key={d} className="py-2 sm:py-2.5 text-center text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide">{d}</div>
         ))}
       </div>
+
+      {/* Calendar grid - mobile: slightly larger cells */}
       <div className="grid grid-cols-7 divide-x divide-gray-50">
         {cells.map((d, i) => {
           const key = d ? isoDate(d) : '';
           const appts = d ? (byDay.get(key) || []) : [];
-          const shown = appts.slice(0, 3);
-          const extra = appts.length - 3;
+          const shown = appts.slice(0, 2); // Show fewer on mobile
+          const extra = appts.length - 2;
           return (
             <div
               key={i}
-              className={`min-h-[100px] border-b border-gray-50 p-1.5 ${d ? 'cursor-pointer hover:bg-gray-50/50' : 'bg-gray-50/30'}`}
+              className={`min-h-[80px] sm:min-h-[100px] border-b border-gray-50 p-1 sm:p-1.5 ${d ? 'cursor-pointer hover:bg-gray-50/50 active:bg-gray-100' : 'bg-gray-50/30'}`}
               onClick={() => d && onDayClick(d)}
             >
               {d && (
                 <>
-                  <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full mb-1 ${
-                    isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-700'
-                  }`}>
-                    {d.getDate()}
-                  </span>
+                  {/* Day number - larger touch target on mobile */}
+                  <div className="flex justify-between items-start mb-0.5">
+                    <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-6 sm:h-6 text-xs font-medium rounded-full ${
+                      isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-700'
+                    }`}>
+                      {d.getDate()}
+                    </span>
+                    {/* Appointment count badge on mobile */}
+                    {appts.length > 0 && (
+                      <span className="sm:hidden inline-flex items-center justify-center min-w-[18px] h-[18px] text-[10px] font-medium rounded-full bg-gray-100 text-gray-600">
+                        {appts.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Appointments - stacked on mobile */}
                   <div className="space-y-0.5">
                     {shown.map((a) => (
                       <div
                         key={a.id}
                         onClick={(e) => { e.stopPropagation(); onApptClick(a.id); }}
-                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border truncate cursor-pointer hover:opacity-80 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
+                        className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] sm:text-xs border truncate cursor-pointer hover:opacity-80 touch-manipulation min-h-[20px] ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[a.status] ?? 'bg-gray-400'}`} />
-                        <span className="truncate">{fmt(a.starts_at, 'time')} {a.patient_name.split(' ')[0]}</span>
+                        <span className="truncate hidden sm:inline">{fmt(a.starts_at, 'time')} </span>
+                        <span className="truncate">{a.patient_name.split(' ')[0]}</span>
                       </div>
                     ))}
-                    {extra > 0 && <div className="text-xs text-gray-400 px-1.5">+{extra} más</div>}
+                    {extra > 0 && (
+                      <div className="text-[10px] sm:text-xs text-gray-400 px-0.5 sm:px-1.5 truncate">
+                        +{extra} más
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -139,6 +158,7 @@ function MonthView({
 const HOUR_START = 7;
 const HOUR_END   = 21;
 const TOTAL_MINS = (HOUR_END - HOUR_START) * 60;
+const DAY_MIN_WIDTH = 100; // px - min width for each day column on mobile
 
 function WeekView({
   weekStart, appointments, onApptClick, today,
@@ -154,53 +174,67 @@ function WeekView({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-gray-100">
-        <div />
-        {days.map((d, i) => (
-          <div key={i} className={`py-3 text-center border-l border-gray-100 ${isToday(d, today) ? 'bg-gray-50' : ''}`}>
-            <p className="text-xs text-gray-500 uppercase">{DAYS_SHORT[d.getDay()]}</p>
-            <p className={`text-base font-semibold mt-0.5 w-8 h-8 mx-auto flex items-center justify-center rounded-full ${isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-900'}`}>
-              {d.getDate()}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div className="overflow-y-auto max-h-[600px]">
-        <div className="relative grid grid-cols-[56px_repeat(7,1fr)]">
-          {hours.map((h) => (
-            <div key={h} className="contents">
-              <div className="py-6 px-2 text-right">
-                <span className="text-xs text-gray-400">{h}:00</span>
-              </div>
-              {days.map((_, di) => (
-                <div key={di} className="border-l border-t border-gray-50 h-12" />
-              ))}
+      {/* Header - Mobile: scrollable container */}
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="grid grid-cols-[56px_repeat(7,minmax(100px,1fr))] min-w-[756px] sm:min-w-0 sm:grid-cols-[56px_repeat(7,1fr)] border-b border-gray-100">
+          <div className="sticky left-0 bg-white z-10" />
+          {days.map((d, i) => (
+            <div key={i} className={`py-3 text-center border-l border-gray-100 ${isToday(d, today) ? 'bg-gray-50' : ''}`}>
+              <p className="text-xs text-gray-500 uppercase">{DAYS_SHORT[d.getDay()]}</p>
+              <p className={`text-base font-semibold mt-0.5 w-8 h-8 mx-auto flex items-center justify-center rounded-full ${isToday(d, today) ? 'bg-gray-900 text-white' : 'text-gray-900'}`}>
+                {d.getDate()}
+              </p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Grid - Mobile: horizontal scroll */}
+      <div className="overflow-x-auto scrollbar-hide max-h-[500px] sm:max-h-[600px]">
+        <div className="relative grid grid-cols-[56px_repeat(7,minmax(100px,1fr))] min-w-[756px] sm:min-w-0 sm:grid-cols-[56px_repeat(7,1fr)]">
+          {/* Time column - sticky on mobile */}
+          <div className="sticky left-0 bg-white z-10 border-r border-gray-100">
+            {hours.map((h) => (
+              <div key={h} className="py-4 sm:py-6 px-2 text-right h-12 sm:h-auto">
+                <span className="text-xs text-gray-400">{h}:00</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
           {days.map((d, di) => {
             const key = isoDate(d);
             const dayAppts = appointments.filter((a) => a.starts_at.slice(0, 10) === key);
-            return dayAppts.map((a) => {
-              const start = new Date(a.starts_at);
-              const end = new Date(a.ends_at);
-              const startMin = (start.getHours() - HOUR_START) * 60 + start.getMinutes();
-              const endMin = (end.getHours() - HOUR_START) * 60 + end.getMinutes();
-              const top = Math.max(0, (startMin / TOTAL_MINS) * 100);
-              const height = Math.max(2, ((endMin - startMin) / TOTAL_MINS) * 100);
-              const colLeft = `calc(56px + ${di} * (100% - 56px) / 7)`;
-              const colWidth = `calc((100% - 56px) / 7 - 2px)`;
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => onApptClick(a.id)}
-                  style={{ position: 'absolute', top: `${top}%`, height: `${height}%`, left: colLeft, width: colWidth }}
-                  className={`rounded px-1.5 py-0.5 text-xs border overflow-hidden cursor-pointer hover:opacity-90 ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
-                >
-                  <p className="font-medium truncate">{a.patient_name.split(' ')[0]}</p>
-                  <p className="opacity-70 truncate">{fmt(a.starts_at, 'time')}</p>
-                </div>
-              );
-            });
+            return (
+              <div key={di} className="relative border-l border-gray-50 min-h-[600px]">
+                {/* Hour grid lines */}
+                {hours.map((h) => (
+                  <div key={h} className="border-t border-gray-50 h-12 sm:h-auto sm:py-4" />
+                ))}
+
+                {/* Appointments */}
+                {dayAppts.map((a) => {
+                  const start = new Date(a.starts_at);
+                  const end = new Date(a.ends_at);
+                  const startMin = (start.getHours() - HOUR_START) * 60 + start.getMinutes();
+                  const endMin = (end.getHours() - HOUR_START) * 60 + end.getMinutes();
+                  const top = Math.max(0, (startMin / TOTAL_MINS) * 100);
+                  const height = Math.max(3, ((endMin - startMin) / TOTAL_MINS) * 100);
+
+                  return (
+                    <div
+                      key={a.id}
+                      onClick={() => onApptClick(a.id)}
+                      style={{ position: 'absolute', top: `${top}%`, height: `${height}%`, left: '2px', right: '2px' }}
+                      className={`rounded px-1.5 sm:px-2 py-1 text-xs border overflow-hidden cursor-pointer hover:opacity-90 active:scale-[0.98] transition-transform touch-manipulation ${STATUS_COLORS[a.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
+                    >
+                      <p className="font-medium truncate leading-tight">{a.patient_name.split(' ')[0]}</p>
+                      <p className="opacity-70 truncate text-[10px] sm:text-xs">{fmt(a.starts_at, 'time')}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            );
           })}
         </div>
       </div>
@@ -382,15 +416,15 @@ export function Agenda() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      {/* Filters - Mobile: full width, stacked / Desktop: inline */}
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-5">
         {/* Procedimiento */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5 sm:gap-1 flex-1 sm:flex-auto min-w-0">
           <span className="text-xs text-gray-400 font-medium">Procedimiento</span>
           <select
             value={filterTreatment}
             onChange={(e) => setFilterTreatment(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 min-w-[160px]"
+            className="w-full sm:w-auto sm:min-w-[160px] px-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 touch-manipulation"
           >
             <option value="">Todos</option>
             {treatmentOptions.map((t) => (
@@ -401,12 +435,12 @@ export function Agenda() {
 
         {/* Responsable */}
         {!isDoctor && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5 sm:gap-1 flex-1 sm:flex-auto min-w-0">
             <span className="text-xs text-gray-400 font-medium">Responsable</span>
             <select
               value={filterDoctor}
               onChange={(e) => setFilterDoctor(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 min-w-[160px]"
+              className="w-full sm:w-auto sm:min-w-[160px] px-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 touch-manipulation"
             >
               <option value="">Todos</option>
               {doctors.map((d) => (
@@ -419,12 +453,12 @@ export function Agenda() {
         )}
 
         {/* Estado */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5 sm:gap-1 flex-1 sm:flex-auto min-w-0">
           <span className="text-xs text-gray-400 font-medium">Estado</span>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 min-w-[160px]"
+            className="w-full sm:w-auto sm:min-w-[160px] px-3 py-2.5 sm:py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900 touch-manipulation"
           >
             <option value="">Todos</option>
             {Object.entries(STATUS_LABEL).map(([k, v]) => (
@@ -433,37 +467,62 @@ export function Agenda() {
           </select>
         </div>
 
+        {/* Clear button - aligned bottom on desktop */}
         {(filterTreatment || filterDoctor || filterStatus) && (
-          <button
-            onClick={() => { setFilterTreatment(''); setFilterDoctor(''); setFilterStatus(''); }}
-            className="mt-5 px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Limpiar filtros
-          </button>
+          <div className="flex items-end">
+            <button
+              onClick={() => { setFilterTreatment(''); setFilterDoctor(''); setFilterStatus(''); }}
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm sm:text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors touch-manipulation"
+            >
+              Limpiar filtros
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Calendar toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <h2 className="text-base font-semibold text-gray-900 min-w-[200px] text-center capitalize">{headerLabel()}</h2>
-          <button onClick={() => navigate(1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          </button>
-          <button onClick={goToday} className="ml-1 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            Hoy
-          </button>
-          {calLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-300 ml-1" />}
+      {/* Calendar toolbar - Mobile: full width, larger touch targets */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 mb-4">
+        {/* Navigation */}
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Anterior"
+            >
+              <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
+            </button>
+            <h2 className="text-sm sm:text-base font-semibold text-gray-900 min-w-[140px] sm:min-w-[200px] text-center capitalize">
+              {headerLabel()}
+            </h2>
+            <button
+              onClick={() => navigate(1)}
+              className="p-2.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Siguiente"
+            >
+              <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToday}
+              className="px-4 py-2 sm:px-3 sm:py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors touch-manipulation min-h-[44px] sm:min-h-0"
+            >
+              Hoy
+            </button>
+            {calLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-300" />}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* View switcher - Mobile: full width */}
+        <div className="flex justify-center sm:justify-start">
           <div className="flex border border-gray-200 rounded-lg overflow-hidden bg-white">
             {(['day', 'week', 'month'] as View[]).map((v) => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${view === v ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-4 py-2.5 sm:px-3 sm:py-2 text-sm font-medium transition-colors touch-manipulation min-h-[44px] sm:min-h-0 ${view === v ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
                 {v === 'month' ? 'Mes' : v === 'week' ? 'Semana' : 'Día'}
               </button>
             ))}

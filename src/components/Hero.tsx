@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from './ui/Button';
-import { Star, Award, Clock, Users, ArrowRight, type LucideIcon, Heart, Shield, Zap, ThumbsUp, TrendingUp, CheckCircle } from 'lucide-react';
+import { Star, Award, Clock, Users, type LucideIcon, Heart, Shield, Zap, ThumbsUp, TrendingUp, CheckCircle } from 'lucide-react';
 
 type TrustIndicator = {
   icon: string;
@@ -162,22 +162,22 @@ export function Hero({ onBook, headline, description, heroImageUrl, heroImageUrl
             </Button>
           </motion.div>
 
-          {/* Trust Indicators */}
+          {/* Trust Indicators - Mobile: 2 cols with smaller gap, Desktop: 4 cols */}
           <motion.div
             variants={itemVariants}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-[#8B9E8B]/20 pt-12">
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 border-t border-[#8B9E8B]/20 pt-8 md:pt-12">
 
             {(trustIndicators && trustIndicators.length > 0 ? trustIndicators : defaultIndicators).map((item, index) => {
               const Icon = iconMap[(item.icon || '').toLowerCase()] || Star;
               return (
                 <div
                   key={index}
-                  className="flex flex-col items-center justify-center text-center">
-                  <Icon className="h-6 w-6 text-[#8B9E8B] mb-3" />
-                  <span className="block text-lg font-medium text-[#2D2D2D]">
+                  className="flex flex-col items-center justify-center text-center p-2">
+                  <Icon className="h-5 w-5 md:h-6 md:w-6 text-[#8B9E8B] mb-2 md:mb-3" />
+                  <span className="block text-sm md:text-lg font-medium text-[#2D2D2D]">
                     {item.label}
                   </span>
-                  <span className="text-sm text-[#6B6B6B]">{item.sub}</span>
+                  <span className="text-xs md:text-sm text-[#6B6B6B]">{item.sub}</span>
                 </div>
               );
             })}
