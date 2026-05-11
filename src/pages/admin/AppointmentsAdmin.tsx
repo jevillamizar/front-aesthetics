@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import {
-  CalendarDays, ChevronDown, ChevronUp, Clock,
+  CalendarDays, Clock,
   Loader2, Pencil, Save, Trash2, UserPlus, X,
 } from 'lucide-react';
 
@@ -149,9 +149,6 @@ export function AppointmentsAdmin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [historial, setHistorial]             = useState<Appointment[]>([]);
-  const [historialLoading, setHistorialLoading] = useState(false);
-  const [historialExpanded, setHistorialExpanded] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -192,18 +189,9 @@ export function AppointmentsAdmin() {
     setDoctors((await dRes.json()).doctors || []);
   };
 
-  const loadHistorial = useCallback(async () => {
-    setHistorialLoading(true);
-    try {
-      const res = await apiFetch('/api/appointments/?past=1');
-      setHistorial((await res.json()).appointments || []);
-    } finally {
-      setHistorialLoading(false);
-    }
-  }, []);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadMeta(); loadHistorial(); }, [loadHistorial]);
+  useEffect(() => { loadMeta(); }, []);
 
   const openNew = () => {
     setEditing({ ...empty });
@@ -464,44 +452,6 @@ export function AppointmentsAdmin() {
                     </div>
                   </div>
 
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Historial colapsable */}
-      <div>
-        <button onClick={() => setHistorialExpanded((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-gray-200 hover:bg-gray-50/50 transition-colors">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Historial</span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{historial.length}</span>
-          </div>
-          {historialExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-        </button>
-        {historialExpanded && (
-          <div className="bg-white rounded-b-xl border border-t-0 border-gray-200 divide-y divide-gray-50">
-            {historialLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>
-            ) : historial.length === 0 ? (
-              <div className="py-8 text-center"><p className="text-gray-400 text-sm">Sin registros</p></div>
-            ) : historial.map((a) => {
-              const { date, time } = toLocal(a.starts_at);
-              const st = statusInfo(a.status);
-              return (
-                <div key={a.id} className="flex items-center gap-4 px-5 py-3">
-                  <div className="flex-shrink-0 text-xs text-gray-400 w-20">
-                    <p>{date.split('/').slice(0,2).join('/')}</p>
-                    <p className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{time}</p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{a.patient_name}</p>
-                    <p className="text-xs text-gray-400 truncate">{a.treatment_name ?? '—'}</p>
-                  </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
                 </div>
               );
             })}
