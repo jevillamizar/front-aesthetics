@@ -168,26 +168,26 @@ export function TreatmentsAdmin() {
           <p className="text-gray-500 mt-1">{treatments.length} procedimiento{treatments.length !== 1 ? 's' : ''} registrado{treatments.length !== 1 ? 's' : ''}</p>
         </div>
         <button
-          onClick={() => setEditing({ ...emptyForm })}
+          onClick={() => { setEditing({ ...emptyForm }); setError(''); }}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
         >
           <Plus className="w-4 h-4" /> Nuevo Procedimiento
         </button>
       </div>
 
-      {error && (
+      {error && !editing && (
         <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg mb-6">{error}</div>
       )}
 
       {/* Edit modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => { setEditing(null); setError(''); }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editing.id ? 'Editar Procedimiento' : 'Nuevo Procedimiento'}
               </h2>
-              <button onClick={() => setEditing(null)} className="p-1 text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setEditing(null); setError(''); }} className="p-1 text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -297,7 +297,7 @@ export function TreatmentsAdmin() {
                     value={editing.price ?? ''}
                     onChange={(e) => setEditing({ ...editing, price: e.target.value || null })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    placeholder="150.00"
+                    placeholder="150000"
                   />
                 </div>
               </div>
@@ -321,9 +321,13 @@ export function TreatmentsAdmin() {
               </label>
             </div>
 
+            {error && (
+              <div className="px-6 py-3 bg-red-50 text-red-600 text-sm border-t border-red-100">{error}</div>
+            )}
+
             <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
               <button
-                onClick={() => { setEditing(null); setNewCategory(false); }}
+                onClick={() => { setEditing(null); setNewCategory(false); setError(''); }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 Cancelar

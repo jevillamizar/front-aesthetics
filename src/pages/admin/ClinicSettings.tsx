@@ -3,19 +3,34 @@ import { apiFetch } from '../../lib/api';
 import { Loader2, Save, CheckCircle2 } from 'lucide-react';
 
 type ClinicData = {
+  // Información Básica
   name: string;
+  business_name: string;
+  tax_id: string;
+  company_type: string;
+  logo_url: string;
+  short_description: string;
+
+  // Contacto
   phone: string;
+  whatsapp: string;
   email: string;
-  whatsapp_phone: string;
   address: string;
+  city: string;
+  country: string;
+
+  // Redes Sociales
   instagram_url: string;
   facebook_url: string;
-  booking_url: string;
 };
 
 const EMPTY: ClinicData = {
-  name: '', phone: '', email: '', whatsapp_phone: '',
-  address: '', instagram_url: '', facebook_url: '', booking_url: '',
+  // Información Básica
+  name: '', business_name: '', tax_id: '', company_type: '', logo_url: '', short_description: '',
+  // Contacto
+  phone: '', whatsapp: '', email: '', address: '', city: '', country: '',
+  // Redes Sociales
+  instagram_url: '', facebook_url: '',
 };
 
 export function ClinicSettings() {
@@ -65,56 +80,101 @@ export function ClinicSettings() {
           </div>
         )}
 
-        <div className="space-y-4">
-          {/* Nombre */}
+        <div className="space-y-6">
+          {/* Información Básica */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la clínica</label>
-            <input value={form.name} onChange={setF('name')}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-              <input value={form.phone} onChange={setF('phone')} placeholder="+57 1 000 0000"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
-              <input value={form.whatsapp_phone} onChange={setF('whatsapp_phone')} placeholder="+57 300 000 0000"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Correo de contacto</label>
-              <input type="email" value={form.email} onChange={setF('email')}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-              <input value={form.address} onChange={setF('address')}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Información Básica</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la clínica</label>
+                <input value={form.name} onChange={setF('name')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Razón social</label>
+                  <input value={form.business_name} onChange={setF('business_name')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NIT</label>
+                  <input value={form.tax_id} onChange={setF('tax_id')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de empresa</label>
+                <input value={form.company_type} onChange={setF('company_type')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+                <input value={form.logo_url} onChange={setF('logo_url')} placeholder="https://..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción corta</label>
+                <input value={form.short_description} onChange={setF('short_description')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
             </div>
           </div>
 
           <hr className="border-gray-100" />
 
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Redes y reservas</p>
+          {/* Contacto */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contacto</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <input value={form.phone} onChange={setF('phone')} placeholder="+57 1 000 0000"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+                <input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="+57 300 000 0000"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Correo principal</label>
+                <input type="email" value={form.email} onChange={setF('email')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                <input value={form.address} onChange={setF('address')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                <input value={form.city} onChange={setF('city')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
+                <input value={form.country} onChange={setF('country')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+            </div>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
-              <input value={form.instagram_url} onChange={setF('instagram_url')} placeholder="https://instagram.com/…"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
-              <input value={form.facebook_url} onChange={setF('facebook_url')} placeholder="https://facebook.com/…"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL de reservas online</label>
-              <input value={form.booking_url} onChange={setF('booking_url')} placeholder="https://…"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+          <hr className="border-gray-100" />
+
+          {/* Redes Sociales */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Redes Sociales</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+                <input value={form.instagram_url} onChange={setF('instagram_url')} placeholder="https://instagram.com/…"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
+                <input value={form.facebook_url} onChange={setF('facebook_url')} placeholder="https://facebook.com/…"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
             </div>
           </div>
         </div>
