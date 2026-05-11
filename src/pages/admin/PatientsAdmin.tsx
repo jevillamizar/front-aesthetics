@@ -1,88 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
-import { AlertTriangle, Loader2, Pencil, Plus, Save, Search, Trash2, Users, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { PatientModal, type Patient as ModalPatient } from '../../components/PatientModal';
 
-type Patient = {
-  id: number;
-  document_type: string;
-  document_number: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string | null;
-  sex: string;
-  phone: string;
-  email: string;
-  address: string;
-  eps: string;
-  legal_guardian: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relation: string;
-  notes: string;
-};
-
-type FormData = {
-  id?: number;
-  document_type: string;
-  document_number: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  sex: string;
-  phone: string;
-  email: string;
-  address: string;
-  eps: string;
-  legal_guardian: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  emergency_contact_relation: string;
-  notes: string;
-};
-
-const DOC_TYPES = [
-  { value: 'CC',  label: 'Cédula de Ciudadanía' },
-  { value: 'CE',  label: 'Cédula de Extranjería' },
-  { value: 'TI',  label: 'Tarjeta de Identidad' },
-  { value: 'PP',  label: 'Pasaporte' },
-  { value: 'RC',  label: 'Registro Civil' },
-  { value: 'NIT', label: 'NIT' },
-];
-
-const SEX_OPTIONS = [
-  { value: 'M', label: 'Masculino' },
-  { value: 'F', label: 'Femenino' },
-  { value: 'O', label: 'Otro' },
-];
-
-const emptyForm: FormData = {
-  document_type: '',
-  document_number: '',
-  first_name: '',
-  last_name: '',
-  date_of_birth: '',
-  sex: '',
-  phone: '',
-  email: '',
-  address: '',
-  eps: '',
-  legal_guardian: '',
-  emergency_contact_name: '',
-  emergency_contact_phone: '',
-  emergency_contact_relation: '',
-  notes: '',
-};
+type Patient = ModalPatient;
 
 function formatDob(iso: string | null) {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
-}
-function isMinor(dob: string) {
-  if (!dob) return false;
-  const diff = Date.now() - new Date(dob).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)) < 18;
 }
 
 export function PatientsAdmin() {
@@ -90,9 +17,7 @@ export function PatientsAdmin() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState<FormData | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [editing, setEditing] = useState<Patient | null | 'new'>(null);
   const [confirmDelete, setConfirmDelete] = useState<Patient | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -110,69 +35,12 @@ export function PatientsAdmin() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => { setError(''); setEditing({ ...emptyForm }); };
-  const openEdit = (p: Patient) => {
-    setError('');
-    setEditing({
-      id: p.id,
-      document_type: p.document_type,
-      document_number: p.document_number,
-      first_name: p.first_name,
-      last_name: p.last_name,
-      date_of_birth: p.date_of_birth ?? '',
-      sex: p.sex,
-      phone: p.phone,
-      email: p.email,
-      address: p.address,
-      eps: p.eps,
-      legal_guardian: p.legal_guardian,
-      emergency_contact_name: p.emergency_contact_name,
-      emergency_contact_phone: p.emergency_contact_phone,
-      emergency_contact_relation: p.emergency_contact_relation,
-      notes: p.notes,
-    });
-  };
+  const openNew = () => setEditing('new');
+  const openEdit = (p: Patient) => setEditing(p);
 
-  const handleSave = async () => {
-    if (!editing) return;
-    if (!editing.first_name.trim() || !editing.last_name.trim()) {
-      setError('Nombres y apellidos son obligatorios.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      const body = {
-        document_type: editing.document_type,
-        document_number: editing.document_number.trim(),
-        first_name: editing.first_name.trim(),
-        last_name: editing.last_name.trim(),
-        date_of_birth: editing.date_of_birth || null,
-        sex: editing.sex,
-        phone: editing.phone.trim(),
-        email: editing.email.trim(),
-        address: editing.address.trim(),
-        eps: editing.eps.trim(),
-        legal_guardian: editing.legal_guardian.trim(),
-        emergency_contact_name: editing.emergency_contact_name.trim(),
-        emergency_contact_phone: editing.emergency_contact_phone.trim(),
-        emergency_contact_relation: editing.emergency_contact_relation.trim(),
-        notes: editing.notes.trim(),
-      };
-      const isNew = !editing.id;
-      const url = isNew ? '/api/patients/' : `/api/patients/${editing.id}/`;
-      const res = await apiFetch(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(body) });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || 'Error al guardar');
-      }
-      setEditing(null);
-      await load(search);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error');
-    } finally {
-      setSaving(false);
-    }
+  const handleSaved = async () => {
+    setEditing(null);
+    await load(search);
   };
 
   const handleDelete = async () => {
@@ -273,147 +141,12 @@ export function PatientsAdmin() {
         )}
       </div>
 
-      {/* Modal */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="text-lg font-semibold text-gray-900">{editing.id ? 'Editar Paciente' : 'Nuevo Paciente'}</h2>
-              <button onClick={() => setEditing(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="px-6 py-5 space-y-4">
-              {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
-
-              {/* Documento */}
-              <div className="grid grid-cols-[1fr_1.5fr] gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de documento</label>
-                  <select value={editing.document_type} onChange={(e) => setEditing({ ...editing, document_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
-                    <option value="">Seleccionar…</option>
-                    {DOC_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Número de documento</label>
-                  <input type="text" value={editing.document_number} onChange={(e) => setEditing({ ...editing, document_number: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: 1234567890" />
-                </div>
-              </div>
-
-              {/* Nombres y Apellidos */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombres <span className="text-red-500">*</span></label>
-                  <input type="text" value={editing.first_name} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: María Elena" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos <span className="text-red-500">*</span></label>
-                  <input type="text" value={editing.last_name} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: García López" />
-                </div>
-              </div>
-
-              {/* Fecha de nacimiento + Sexo */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
-                  <input type="date" value={editing.date_of_birth} onChange={(e) => setEditing({ ...editing, date_of_birth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-                  <select value={editing.sex} onChange={(e) => setEditing({ ...editing, sex: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white">
-                    <option value="">Seleccionar…</option>
-                    {SEX_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Teléfono + Email */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                  <input type="tel" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="+57 300 000 0000" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
-                  <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="paciente@email.com" />
-                </div>
-              </div>
-
-              {/* Dirección */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                <input type="text" value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Calle, número, barrio, ciudad" />
-              </div>
-
-              {/* Datos administrativos */}
-              <div className="pt-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Datos administrativos</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">EPS</label>
-                    <input type="text" value={editing.eps} onChange={(e) => setEditing({ ...editing, eps: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre de la EPS" />
-                  </div>
-                  {isMinor(editing.date_of_birth) && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Responsable <span className="text-xs text-amber-600 font-normal">(menor de edad)</span></label>
-                      <input type="text" value={editing.legal_guardian} onChange={(e) => setEditing({ ...editing, legal_guardian: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre completo del responsable" />
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contacto de emergencia</label>
-                      <input type="text" value={editing.emergency_contact_name} onChange={(e) => setEditing({ ...editing, emergency_contact_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Nombre" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
-                      <input type="text" value={editing.emergency_contact_relation} onChange={(e) => setEditing({ ...editing, emergency_contact_relation: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="Ej: Madre, Esposo…" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono de emergencia</label>
-                    <input type="tel" value={editing.emergency_contact_phone} onChange={(e) => setEditing({ ...editing, emergency_contact_phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="+57 300 000 0000" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Notas */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-                <textarea value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
-                  rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                  placeholder="Observaciones generales…" />
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {editing.id ? 'Guardar cambios' : 'Crear paciente'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {editing !== null && (
+        <PatientModal
+          patient={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={handleSaved}
+        />
       )}
       {/* Delete confirmation modal */}
       {confirmDelete && (
