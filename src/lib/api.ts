@@ -8,25 +8,24 @@ export function getApiBase(): string {
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = localStorage.getItem(TOKEN_KEY);
   const isFormData = options.body instanceof FormData;
+  const url = `${getApiBase()}${path}`;
 
+  // If body is FormData, let browser set Content-Type with boundary
   if (isFormData) {
-    const { headers: _ignored, ...restOptions } = options as Record<string, unknown>;
-    void _ignored;
-    const req = new Request(`${getApiBase()}${path}`, {
-      ...restOptions,
-    });
-    if (token) req.headers.append('Authorization', `Bearer ${token}`);
-    return fetch(req);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // DO NOT set Content-Type - browser will set it with boundary for FormData
+    return fetch(url, { ...options, headers });
   }
 
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string> || {}),
-  };
+  const { headers = {}, ...rest } = options;
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   if (!headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
-  return fetch(`${getApiBase()}${path}`, { ...options, headers });
+  return fetch(url, { ...rest, headers });
 }

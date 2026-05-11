@@ -13,6 +13,7 @@ type LandingPayload = {
     id: number;
     name: string;
     slug: string;
+    logo_url: string;
   };
   landing: null | {
     headline: string;
@@ -25,15 +26,16 @@ type LandingPayload = {
     font_heading: string;
     font_body: string;
     font_accent: string;
-    logo_url: string;
+    show_name: boolean;
+    show_logo: boolean;
     hero_image_url: string;
     hero_image_urls: string[];
-    trust_indicators: Array<{ icon: string; label: string; sub: string }>;
-    testimonials: Array<{ name: string; treatment: string; rating: number; quote: string; social_url?: string }>;
+    trust_indicators: Array<Record<string, string>>;
+    testimonials: Array<Record<string, unknown>>;
     about_title: string;
     about_subtitle: string;
     about_description: string;
-    about_bullets: (string | { title: string; description?: string; image_url?: string })[];
+    about_bullets: string[];
     about_image_url: string;
     about_image_urls: string[];
     about_badge_title: string;
@@ -61,12 +63,13 @@ export function App() {
     fetch(landingEndpoint, { method: 'GET' })
       .then(async (res) => {
         const data = (await res.json().catch(() => null)) as LandingPayload | null;
+        console.log('Landing data received:', data);
         if (!res.ok) return;
         if (!data) return;
         setLandingData(data);
       })
-      .catch(() => {
-        // ignore: fallback to defaults
+      .catch((err) => {
+        console.error('Landing fetch error:', err);
       });
   }, [landingEndpoint]);
 
@@ -114,7 +117,11 @@ export function App() {
   }, [landingData, fontHeading, fontBody, fontAccent]);
 
   const brandName = landingData?.clinic?.name || 'Lumina Aesthetics';
-  const logoUrl = landingData?.landing?.logo_url?.trim() || '';
+  const logoUrl = landingData?.clinic?.logo_url?.trim() || '';
+
+  // Logo display settings from landing page config
+  const showName = landingData?.landing?.show_name ?? true;
+  const showLogo = landingData?.landing?.show_logo ?? true;
   const heroHeadline = landingData?.landing?.headline?.trim() || undefined;
   const heroDescription = landingData?.landing?.description?.trim() || undefined;
   const heroImageUrl = landingData?.landing?.hero_image_url?.trim() || undefined;
@@ -134,16 +141,17 @@ export function App() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F5F5F3]">
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
           <a href="#home" className="inline-flex items-center gap-3 shrink-0">
-            {logoUrl ? (
-              <>
-                <img src={logoUrl} alt={brandName} className="h-12 max-h-12 w-auto object-contain rounded-xl" />
-                <span className="text-base md:text-lg font-medium hidden sm:inline" style={{ color: 'var(--text)' }}>{brandName}</span>
-              </>
-            ) : (
+            {showLogo && logoUrl ? (
+              <img src={logoUrl} alt={brandName} className="h-12 max-h-12 w-auto object-contain rounded-xl" />
+            ) : null}
+            {showName ? (
+              <span className="text-base md:text-lg font-medium hidden sm:inline" style={{ color: 'var(--text)' }}>{brandName}</span>
+            ) : null}
+            {!showLogo && !showName ? (
               <span className="text-2xl italic" style={{ color: 'var(--text)', fontFamily: "var(--font-heading, 'Playfair Display', serif)" }}>
                 {brandName}
               </span>
-            )}
+            ) : null}
           </a>
 
           <div className="hidden md:flex items-center gap-8">

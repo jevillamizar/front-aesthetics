@@ -148,7 +148,8 @@ const sections: { title: string; fields: FieldDef[] }[] = [
   {
     title: 'Marca',
     fields: [
-      { key: 'logo', label: 'Logo', type: 'image' },
+      { key: 'show_name', label: 'Mostrar nombre de la clínica', type: 'checkbox' },
+      { key: 'show_logo', label: 'Mostrar logo de la clínica', type: 'checkbox' },
       { key: 'is_published', label: 'Publicado', type: 'checkbox' },
     ],
   },

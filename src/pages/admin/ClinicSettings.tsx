@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../../lib/api';
-import { Loader2, Save, CheckCircle2 } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, Upload, X } from 'lucide-react';
 
 type ClinicData = {
   // Información Básica
@@ -47,16 +47,34 @@ export function ClinicSettings() {
       .finally(() => setLoading(false));
   }, []);
 
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
   const setF = (key: keyof ClinicData) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [key]: e.target.value }));
 
   const handleSave = async () => {
     setSaving(true); setError(''); setSuccess(false);
     try {
-      const res = await apiFetch('/api/clinic/', { method: 'PUT', body: JSON.stringify(form) });
+      // Use FormData for file upload support
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (key !== 'logo_url') { // Don't send logo_url as text, use file instead
+          formData.append(key, value || '');
+        }
+      });
+      if (logoFile) {
+        formData.append('logo', logoFile);
+      }
+
+      const res = await apiFetch('/api/clinic/', {
+        method: 'POST',
+        body: formData
+      });
       const d = await res.json();
       if (!res.ok) throw new Error(d.detail || 'Error al guardar');
       setForm({ ...EMPTY, ...d.clinic });
+      setLogoFile(null);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (e: unknown) {
@@ -108,9 +126,53 @@ export function ClinicSettings() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                <input value={form.logo_url} onChange={setF('logo_url')} placeholder="https://..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
+                <div className="space-y-2">
+                  {/* Logo Preview */}
+                  {form.logo_url && !logoFile && (
+                    <div className="relative inline-block">
+                      <img src={form.logo_url} alt="Logo actual" className="h-24 w-auto rounded-lg object-cover border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, logo_url: '' }))}
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  {logoFile && (
+                    <div className="relative inline-block">
+                      <img src={URL.createObjectURL(logoFile)} alt="Nuevo logo" className="h-24 w-auto rounded-lg object-cover border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setLogoFile(null)}
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  {/* File Input */}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setLogoFile(f);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {form.logo_url || logoFile ? 'Cambiar logo' : 'Subir logo'}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Descripción corta</label>
