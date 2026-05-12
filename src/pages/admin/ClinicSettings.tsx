@@ -89,7 +89,6 @@ export function ClinicSettings() {
   return (
     <div className="max-w-2xl">
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-5">Datos de la Clínica</h2>
 
         {error && <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
         {success && (

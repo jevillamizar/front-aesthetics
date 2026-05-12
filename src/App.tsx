@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState  } from 'react';
 import { Hero } from './components/Hero';
 import { Services } from './components/Services';
 import { About } from './components/About';
@@ -6,7 +6,10 @@ import { Testimonials } from './components/Testimonials';
 import { Contact } from './components/Contact';
 import { AppointmentModal } from './components/AppointmentModal';
 import { Button } from './components/ui/Button';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+
+type TrustIndicator = { icon: string; label: string; sub: string };
+type TestimonialItem = { name: string; treatment: string; rating: number; quote: string; social_url?: string };
 
 type LandingPayload = {
   clinic: {
@@ -30,8 +33,8 @@ type LandingPayload = {
     show_logo: boolean;
     hero_image_url: string;
     hero_image_urls: string[];
-    trust_indicators: Array<Record<string, string>>;
-    testimonials: Array<Record<string, unknown>>;
+    trust_indicators: TrustIndicator[];
+    testimonials: TestimonialItem[];
     about_title: string;
     about_subtitle: string;
     about_description: string;
@@ -50,9 +53,40 @@ type LandingPayload = {
   };
 };
 
+const NAV_LINKS = [
+  { href: '#services', label: 'Procedimientos' },
+  { href: '#about',    label: 'Sobre Nosotros' },
+  { href: '#testimonials', label: 'Reseñas' },
+  { href: '#contact',  label: 'Contacto' },
+];
+
 export function App() {
   const [appointmentOpen, setAppointmentOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [landingData, setLandingData] = useState<LandingPayload | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: Event) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
+  }, [menuOpen]);
+ 
+  // Prevent body scroll when menu is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
 
   const apiBase =
     (import.meta.env.VITE_API_BASE ?? '').trim() ||
@@ -125,6 +159,10 @@ export function App() {
   const heroHeadline = landingData?.landing?.headline?.trim() || undefined;
   const heroDescription = landingData?.landing?.description?.trim() || undefined;
   const heroImageUrl = landingData?.landing?.hero_image_url?.trim() || undefined;
+  const instagramUrl = landingData?.landing?.instagram_url?.trim() || '';
+  const facebookUrl  = landingData?.landing?.facebook_url?.trim()  || '';
+  const whatsappPhone = landingData?.landing?.whatsapp_phone?.trim() || '';
+
   const heroImageUrls = (
     landingData?.landing?.hero_image_urls?.length
       ? landingData.landing.hero_image_urls
@@ -132,20 +170,30 @@ export function App() {
   ).map((u) => u.trim()).filter(Boolean);
   const trustIndicators = landingData?.landing?.trust_indicators;
 
+  function handleNavClick(href: string) {
+    setMenuOpen(false);
+    // Small delay so the menu closes before scroll
+    setTimeout(() => {
+      const el = document.querySelector(href);
+      el?.scrollIntoView({ behavior: 'smooth' });
+    }, 150);
+  }
+
   return (
     <div
       className="min-h-screen"
       style={{ ...themeStyle, backgroundColor: 'var(--background)', color: 'var(--text)', fontFamily: fontBody ? `'${fontBody}', sans-serif` : undefined }}
       >
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F5F5F3]">
-        <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
+      <nav ref={menuRef} className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#F5F5F3]">
+        {/* Desktop & tablet bar */}
+        <div className="container mx-auto px-4 lg:px-6 h-20 hidden lg:flex items-center justify-between">
           <a href="#home" className="inline-flex items-center gap-3 shrink-0">
             {showLogo && logoUrl ? (
               <img src={logoUrl} alt={brandName} className="h-12 max-h-12 w-auto object-contain rounded-xl" />
             ) : null}
             {showName ? (
-              <span className="text-base md:text-lg font-medium hidden sm:inline" style={{ color: 'var(--text)' }}>{brandName}</span>
+              <span className="text-base lg:text-lg font-medium" style={{ color: 'var(--text)' }}>{brandName}</span>
             ) : null}
             {!showLogo && !showName ? (
               <span className="text-2xl italic" style={{ color: 'var(--text)', fontFamily: "var(--font-heading, 'Playfair Display', serif)" }}>
@@ -154,39 +202,82 @@ export function App() {
             ) : null}
           </a>
 
-          <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#services"
-              className="nav-link text-sm font-medium transition-colors">
-
-              Procedimientos
-            </a>
-            <a
-              href="#about"
-              className="nav-link text-sm font-medium transition-colors">
-
-              Sobre Nosotros
-            </a>
-            <a
-              href="#testimonials"
-              className="nav-link text-sm font-medium transition-colors">
-
-              Reseñas
-            </a>
-            <a
-              href="#contact"
-              className="nav-link text-sm font-medium transition-colors">
-
-              Contacto
-            </a>
-            <Button size="sm" onClick={() => setAppointmentOpen(true)}>
-              Agendar valoración
-            </Button>
+          <div className="flex items-center gap-8">
+            {NAV_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="nav-link text-sm font-medium transition-colors">
+                {link.label}
+              </a>
+            ))}
+            <Button size="sm" onClick={() => setAppointmentOpen(true)}>Agendar valoración</Button>
           </div>
+        </div>
 
-          <button className="md:hidden p-2" style={{ color: 'var(--text)' }}>
-            <Menu className="w-6 h-6" />
+        {/* Mobile bar */}
+        <div className="lg:hidden flex items-center justify-between px-4 h-24">
+          {/* Hamburger — left */}
+          <button
+            className="p-2 rounded-lg transition-colors hover:bg-black/5 shrink-0"
+            style={{ color: 'var(--text)' }}
+            aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
+            {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
+
+          {/* Brand — center */}
+          <a href="#home" className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1">
+            {showLogo && logoUrl ? (
+              <img src={logoUrl} alt={brandName} className="h-14 max-h-14 w-auto object-contain rounded-xl" />
+            ) : null}
+            {(showName || (!showLogo && !showName)) ? (
+              <span
+                className="text-base font-semibold text-center leading-tight"
+                style={{ color: 'var(--text)', maxWidth: '160px' }}
+              >
+                {brandName}
+              </span>
+            ) : null}
+          </a>
+
+          {/* Spacer — right (balances hamburger) */}
+          <div className="w-10 shrink-0" />
+        </div>
+
+        {/* Mobile dropdown */}
+        <div
+          className={`lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            menuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
+          }`}
+          aria-hidden={!menuOpen}
+        >
+          <div className="bg-white/95 backdrop-blur-md border-t border-black/5 px-4 py-4 flex flex-col gap-1">
+            {NAV_LINKS.map((link, i) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={(e) => { e.preventDefault(); handleNavClick(link.href); }}
+                className="nav-link text-sm font-medium px-3 py-3 rounded-lg transition-colors hover:bg-black/5"
+                style={{
+                  transitionDelay: menuOpen ? `${i * 40}ms` : '0ms',
+                  opacity: menuOpen ? 1 : 0,
+                  transform: menuOpen ? 'translateX(0)' : 'translateX(-8px)',
+                  transition: 'opacity 0.25s ease, transform 0.25s ease',
+                }}
+              >
+                {link.label}
+              </a>
+            ))}
+            <div className="pt-2 border-t border-black/5 mt-1">
+              <Button
+                size="sm"
+                className="w-full justify-center"
+                onClick={() => { setMenuOpen(false); setAppointmentOpen(true); }}
+              >
+                Agendar valoración
+              </Button>
+            </div>
+          </div>
         </div>
       </nav>
 
@@ -198,6 +289,9 @@ export function App() {
           heroImageUrl={heroImageUrl}
           heroImageUrls={heroImageUrls}
           trustIndicators={trustIndicators}
+          instagramUrl={instagramUrl}
+          facebookUrl={facebookUrl}
+          whatsappPhone={whatsappPhone}
         />
         <Services />
         <About landing={landingData?.landing ?? undefined} />

@@ -164,8 +164,7 @@ export function TreatmentsAdmin() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Procedimientos</h1>
-          <p className="text-gray-500 mt-1">{treatments.length} procedimiento{treatments.length !== 1 ? 's' : ''} registrado{treatments.length !== 1 ? 's' : ''}</p>
+          <p className="text-gray-500">{treatments.length} procedimiento{treatments.length !== 1 ? 's' : ''} registrado{treatments.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => { setEditing({ ...emptyForm }); setError(''); }}

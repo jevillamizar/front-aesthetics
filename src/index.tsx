@@ -19,8 +19,23 @@ import { PatientsAdmin } from './pages/admin/PatientsAdmin';
 import { PatientProfile } from './pages/admin/PatientProfile';
 import { RevenueAdmin } from './pages/admin/RevenueAdmin';
 import { TreatmentsAdmin } from './pages/admin/TreatmentsAdmin';
-import { Settings } from './pages/admin/Settings';
+import { AccountSettings } from './pages/admin/AccountSettings';
+import { ClinicSettings } from './pages/admin/ClinicSettings';
+import { LandingEditor } from './pages/admin/LandingEditor';
+import { GoogleCalendarSettings } from './pages/admin/GoogleCalendarSettings';
+import { SettingsLayout } from './pages/admin/Settings';
 import { AvailabilityPage } from './pages/AvailabilityPage';
+
+function NotificationsPlaceholder() {
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Configuración de Notificaciones</h2>
+        <p className="text-gray-500 text-sm">Módulo en construcción…</p>
+      </div>
+    </div>
+  );
+}
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -56,7 +71,15 @@ createRoot(document.getElementById('root')!).render(
             <Route path="patients/:id" element={<PatientProfile />} />
             <Route path="medical-records" element={<MedicalRecordsAdmin />} />
             <Route path="consents" element={<ConsentsAdmin />} />
-            <Route path="settings" element={<Settings />} />
+            <Route path="settings">
+              <Route index element={<Navigate to="account" replace />} />
+              <Route path="account" element={<SettingsLayout title="Mi Cuenta"><AccountSettings /></SettingsLayout>} />
+              <Route path="clinic" element={<SettingsLayout title="Datos de la Clínica"><ClinicSettings /></SettingsLayout>} />
+              <Route path="landing" element={<SettingsLayout title="Landing Page"><LandingEditor /></SettingsLayout>} />
+              <Route path="treatments" element={<SettingsLayout title="Procedimientos"><TreatmentsAdmin /></SettingsLayout>} />
+              <Route path="gcal" element={<SettingsLayout title="Google Calendar"><GoogleCalendarSettings /></SettingsLayout>} />
+              <Route path="notifications" element={<SettingsLayout title="Notificaciones"><NotificationsPlaceholder /></SettingsLayout>} />
+            </Route>
           </Route>
 
           {/* Fallback */}

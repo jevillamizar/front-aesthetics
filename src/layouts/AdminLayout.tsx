@@ -19,6 +19,8 @@ import {
   UserCircle,
   Building2,
   LayoutDashboard,
+  Palette,
+  Scissors,
 } from 'lucide-react';
 
 const topItems = [
@@ -40,6 +42,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -144,22 +147,46 @@ export function AdminLayout() {
             </div>
           )}
 
-          {/* Configuración — always last, admin only */}
+          {/* Configuración — expandable group, admin only */}
           {user?.role === 'ADMIN' && (
-            <NavLink
-              to="/admin/settings"
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`
-              }
-            >
-              <SettingsIcon className="w-5 h-5 flex-shrink-0" />
-              Configuración
-            </NavLink>
+            <div>
+              <button
+                onClick={() => setSettingsOpen((v) => !v)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              >
+                <SettingsIcon className="w-5 h-5 flex-shrink-0" />
+                <span className="flex-1 text-left">Configuración</span>
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {settingsOpen && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-100 pl-3">
+                  {[
+                    { to: '/admin/settings/account',       icon: UserCircle,     label: 'Mi Cuenta' },
+                    { to: '/admin/settings/clinic',        icon: Building2,      label: 'Datos de la Clínica' },
+                    { to: '/admin/settings/landing',       icon: Palette,        label: 'Landing Page' },
+                    { to: '/admin/settings/treatments',    icon: Scissors,       label: 'Procedimientos' },
+                    { to: '/admin/settings/gcal',          icon: CalendarDays,     label: 'Google Calendar' },
+                    //{ to: '/admin/settings/notifications', icon: Bell,           label: 'Notificaciones' },
+                  ].map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`
+                      }
+                    >
+                      <item.icon className="w-4 h-4 flex-shrink-0" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </nav>
 
@@ -227,13 +254,13 @@ export function AdminLayout() {
               {userMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                   <button
-                    onClick={() => { setUserMenuOpen(false); navigate('/admin/settings?tab=account'); }}
+                    onClick={() => { setUserMenuOpen(false); setSettingsOpen(true); navigate('/admin/settings/account'); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                     <UserCircle className="w-4 h-4 text-gray-400" /> Mi Cuenta
                   </button>
                   {user?.role === 'ADMIN' && (
                     <button
-                      onClick={() => { setUserMenuOpen(false); navigate('/admin/settings?tab=clinic'); }}
+                      onClick={() => { setUserMenuOpen(false); setSettingsOpen(true); navigate('/admin/settings/clinic'); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                       <Building2 className="w-4 h-4 text-gray-400" /> Datos de la Clínica
                     </button>

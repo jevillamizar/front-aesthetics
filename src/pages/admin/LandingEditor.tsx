@@ -150,7 +150,7 @@ const sections: { title: string; fields: FieldDef[] }[] = [
     fields: [
       { key: 'show_name', label: 'Mostrar nombre de la clínica', type: 'checkbox' },
       { key: 'show_logo', label: 'Mostrar logo de la clínica', type: 'checkbox' },
-      { key: 'is_published', label: 'Publicado', type: 'checkbox' },
+      { key: 'is_published', label: 'Publicar Landing', type: 'checkbox' },
     ],
   },
 ];
@@ -252,10 +252,7 @@ export function LandingEditor() {
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Landing Page</h1>
-          <p className="text-gray-500 mt-1">Personaliza el contenido de tu página de inicio</p>
-        </div>
+        <p className="text-gray-500">Personaliza el contenido de tu página de inicio</p>
         <a
           href="/"
           target="_blank"
