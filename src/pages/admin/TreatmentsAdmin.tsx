@@ -61,6 +61,7 @@ type Treatment = {
   duration_minutes: number;
   price: string | null;
   is_active: boolean;
+  requires_consent: boolean;
   image_url: string;
   long_description: string;
 };
@@ -75,6 +76,7 @@ const emptyForm: FormData = {
   duration_minutes: 30,
   price: null,
   is_active: true,
+  requires_consent: false,
   image_url: '',
   long_description: '',
 };
@@ -122,6 +124,7 @@ export function TreatmentsAdmin() {
         duration_minutes: editing.duration_minutes,
         price: editing.price || null,
         is_active: editing.is_active,
+        requires_consent: editing.requires_consent,
         image_url: editing.image_url || '',
         long_description: editing.long_description || '',
       };
@@ -318,6 +321,16 @@ export function TreatmentsAdmin() {
                 />
                 <span className="text-sm font-medium text-gray-700">Activo</span>
               </label>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editing.requires_consent}
+                  onChange={(e) => setEditing({ ...editing, requires_consent: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                />
+                <span className="text-sm font-medium text-gray-700">Requiere consentimiento informado</span>
+              </label>
             </div>
 
             {error && (
@@ -367,7 +380,14 @@ export function TreatmentsAdmin() {
                 {treatments.map((t) => (
                   <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-3.5">
-                      <div className="font-medium text-gray-900">{t.name}</div>
+                      <div className="font-medium text-gray-900">
+                        {t.name}
+                        {t.requires_consent && (
+                          <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded border border-indigo-100">
+                            Consent
+                          </span>
+                        )}
+                      </div>
                       {t.description && (
                         <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{t.description}</div>
                       )}

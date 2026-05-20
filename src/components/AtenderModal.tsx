@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
+import { useClinicConfig } from '../lib/clinicConfig';
 import {
   Calendar, Clock, Loader2, Phone, Mail, User, X,
-  CheckCircle, DollarSign, FileSignature, Stethoscope,
+  CheckCircle, DollarSign, Stethoscope,
   UserX, ClipboardList, ArrowRight, CalendarPlus,
 } from 'lucide-react';
 import { NewAppointmentModal } from './NewAppointmentModal';
@@ -22,6 +23,7 @@ type ApptDetail = {
   appointment_type: string;
   patient_id: number; patient_name: string; patient_email: string; patient_phone: string;
   treatment_id: number | null; treatment_name: string | null; treatment_price: number | null;
+  treatment_requires_consent: boolean | null;
   doctor_id: number | null; doctor_name: string | null; doctor_email: string | null;
   payment: PaymentInfo | null; medical_record_id: number | null; consent: ConsentInfo | null;
 };
@@ -254,6 +256,8 @@ function ValoracionCompletadaPanel({ appt, onDone, onClose }: { appt: ApptDetail
 
 function ProcedimientoPendientePanel({ appt, onDone, onClose }: { appt: ApptDetail; onDone: () => void; onClose: () => void }) {
   const navigate = useNavigate();
+  const { config } = useClinicConfig();
+  const hcEnabled = config?.enable_medical_history ?? true;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -263,12 +267,7 @@ function ProcedimientoPendientePanel({ appt, onDone, onClose }: { appt: ApptDeta
   const [payStatus, setPayStatus] = useState('PAID');
   const [payNotes, setPayNotes] = useState('');
 
-  // Consent state
-  const [consentName, setConsentName] = useState(appt.patient_name);
-  const [consentDesc, setConsentDesc] = useState(appt.treatment_name ?? '');
-
   const paymentDone = appt.payment && ['PAID', 'PARTIAL'].includes(appt.payment.status);
-  const consentDone = appt.consent?.signed;
 
   const handleAtender = async () => {
     setSaving(true); setError('');
@@ -280,19 +279,23 @@ function ProcedimientoPendientePanel({ appt, onDone, onClose }: { appt: ApptDeta
         });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al registrar pago');
       }
-      if (!consentDone) {
-        const r = await apiFetch(`/api/appointments/${appt.id}/consent/`, {
-          method: 'POST',
-          body: JSON.stringify({ signed_by_name: consentName, procedure_description: consentDesc }),
+
+      if (!hcEnabled) {
+        // HC desactivada: completar directamente
+        const r = await apiFetch(`/api/appointments/${appt.id}/`, {
+          method: 'PATCH', body: JSON.stringify({ status: 'COMPLETED' }),
         });
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al registrar consentimiento');
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error al completar');
+        onDone(); onClose();
+      } else {
+        // HC activa: transicionar a IN_PROGRESS y navegar a /complete
+        const r = await apiFetch(`/api/appointments/${appt.id}/`, {
+          method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
+        });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error');
+        onClose();
+        navigate(`/admin/appointments/${appt.id}/complete`);
       }
-      const r = await apiFetch(`/api/appointments/${appt.id}/`, {
-        method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
-      });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error');
-      onClose();
-      navigate(`/admin/appointments/${appt.id}/complete`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally { setSaving(false); }
@@ -357,30 +360,6 @@ function ProcedimientoPendientePanel({ appt, onDone, onClose }: { appt: ApptDeta
           )}
         </div>
 
-        {/* Consentimiento */}
-        <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
-            <FileSignature className="w-4 h-4 text-indigo-600" /> Consentimiento
-            {consentDone && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full ml-auto">Firmado</span>}
-          </div>
-          {!consentDone ? (
-            <div className="space-y-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">Firmante</label>
-                <input type="text" value={consentName} onChange={e => setConsentName(e.target.value)}
-                  className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">Procedimiento</label>
-                <input type="text" value={consentDesc} onChange={e => setConsentDesc(e.target.value)}
-                  className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-600">Firmado por: {appt.consent!.signed_by_name}</p>
-          )}
-        </div>
-
         {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{error}</div>}
       </div>
 
@@ -395,7 +374,7 @@ function ProcedimientoPendientePanel({ appt, onDone, onClose }: { appt: ApptDeta
           </button>
           <button onClick={handleAtender} disabled={saving}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Atender →  Historia Clínica
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} {hcEnabled ? 'Atender → Historia Clínica' : 'Marcar como Atendido'}
           </button>
         </div>
       </div>

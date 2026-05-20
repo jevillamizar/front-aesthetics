@@ -25,6 +25,7 @@ import { LandingEditor } from './pages/admin/LandingEditor';
 import { GoogleCalendarSettings } from './pages/admin/GoogleCalendarSettings';
 import { SettingsLayout } from './pages/admin/Settings';
 import { AvailabilityPage } from './pages/AvailabilityPage';
+import { ClinicConfigProvider } from './lib/clinicConfig';
 
 function NotificationsPlaceholder() {
   return (
@@ -54,7 +55,9 @@ createRoot(document.getElementById('root')!).render(
             path="/admin"
             element={
               <ProtectedRoute>
-                <AdminLayout />
+                <ClinicConfigProvider>
+                  <AdminLayout />
+                </ClinicConfigProvider>
               </ProtectedRoute>
             }
           >

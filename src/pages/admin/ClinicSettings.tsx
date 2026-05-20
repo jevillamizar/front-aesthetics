@@ -22,6 +22,10 @@ type ClinicData = {
   // Redes Sociales
   instagram_url: string;
   facebook_url: string;
+
+  // Funcionalidades
+  enable_medical_history: boolean;
+  enable_consent: boolean;
 };
 
 const EMPTY: ClinicData = {
@@ -31,6 +35,8 @@ const EMPTY: ClinicData = {
   phone: '', whatsapp: '', email: '', address: '', city: '', country: '',
   // Redes Sociales
   instagram_url: '', facebook_url: '',
+  // Funcionalidades
+  enable_medical_history: true, enable_consent: true,
 };
 
 export function ClinicSettings() {
@@ -58,11 +64,14 @@ export function ClinicSettings() {
     try {
       // Use FormData for file upload support
       const formData = new FormData();
+      const BOOL_FIELDS = ['enable_medical_history', 'enable_consent'];
       Object.entries(form).forEach(([key, value]) => {
-        if (key !== 'logo_url') { // Don't send logo_url as text, use file instead
-          formData.append(key, value || '');
-        }
+        if (key === 'logo_url') return;
+        if (BOOL_FIELDS.includes(key)) return;
+        formData.append(key, (value as string) || '');
       });
+      formData.append('enable_medical_history', String(form.enable_medical_history));
+      formData.append('enable_consent', String(form.enable_consent));
       if (logoFile) {
         formData.append('logo', logoFile);
       }
@@ -235,6 +244,56 @@ export function ClinicSettings() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
                 <input value={form.facebook_url} onChange={setF('facebook_url')} placeholder="https://facebook.com/…"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-gray-100" />
+
+          {/* Funcionalidades */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Funcionalidades</p>
+            <div className="space-y-4">
+              {/* Toggle Historia Clínica */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Historia Clínica</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Al atender un procedimiento, se abre el formulario de historia clínica
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setForm(p => ({
+                    ...p,
+                    enable_medical_history: !p.enable_medical_history,
+                    enable_consent: !p.enable_medical_history ? false : p.enable_consent,
+                  }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                    ${form.enable_medical_history ? 'bg-gray-900' : 'bg-gray-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${form.enable_medical_history ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {/* Toggle Consentimiento */}
+              <div className={`flex items-center justify-between ${!form.enable_medical_history ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Consentimiento Informado</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Se solicita firma del consentimiento al final de la historia clínica
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!form.enable_medical_history}
+                  onClick={() => setForm(p => ({ ...p, enable_consent: !p.enable_consent }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                    ${form.enable_consent ? 'bg-gray-900' : 'bg-gray-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${form.enable_consent ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
               </div>
             </div>
           </div>

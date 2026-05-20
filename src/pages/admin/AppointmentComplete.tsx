@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
+import { useClinicConfig } from '../../lib/clinicConfig';
+import { SignatureCanvas } from '../../components/SignatureCanvas';
 import {
   ArrowLeft, Calendar, CheckCircle, Clock, ClipboardList,
-  Camera, Loader2, Mail, Phone, Stethoscope, Trash2, Upload, User,
+  Camera, FileSignature, Loader2, Mail, Phone, Stethoscope, Trash2, Upload, User,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -12,8 +14,16 @@ type ApptDetail = {
   id: number; starts_at: string; ends_at: string; status: string; notes: string;
   patient_id: number; patient_name: string; patient_email: string; patient_phone: string;
   treatment_id: number | null; treatment_name: string | null; treatment_price: number | null;
+  treatment_requires_consent: boolean | null;
   doctor_id: number | null; doctor_name: string | null; doctor_email: string | null;
   medical_record_id: number | null;
+};
+
+type ConsentForm = {
+  procedure_description: string;
+  risks: string;
+  signed_by_name: string;
+  signature_data_url: string;
 };
 
 /* ── Medical record fields ─────────────────────────────────────────── */
@@ -87,6 +97,19 @@ export function AppointmentComplete() {
   const beforeRef = useRef<HTMLInputElement>(null);
   const afterRef  = useRef<HTMLInputElement>(null);
 
+  // Consent state
+  const { config } = useClinicConfig();
+  const [consentForm, setConsentForm] = useState<ConsentForm>({
+    procedure_description: '', risks: '', signed_by_name: '', signature_data_url: '',
+  });
+  const [consentData, setConsentData] = useState<{ signed_by_name: string; signature_image: string } | null>(null);
+
+  /** Determina si el consent es requerido para esta cita y config. */
+  const needsConsent = (status: string, treatmentRequiresConsent: boolean | null, treatmentId: number | null): boolean =>
+    !['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(status)
+    && (config?.enable_consent ?? false)
+    && (treatmentRequiresConsent === true || treatmentId === null);
+
   // Photo upload handler
   const handlePhotoUpload = useCallback(async (which: 'before' | 'after', file: File, currentMrId: number) => {
     const setState = which === 'before' ? setPhotoBefore : setPhotoAfter;
@@ -113,14 +136,20 @@ export function AppointmentComplete() {
     apiFetch(`/api/appointments/${id}/`)
       .then(r => r.json())
       .then(d => {
-        setAppt(d.appointment);
-        // If already completed, load the record read-only
+        const a = d.appointment;
+        setAppt(a);
+        // Pre-populate consent form
+        setConsentForm(prev => ({
+          ...prev,
+          procedure_description: a.treatment_name || '',
+          signed_by_name: a.patient_name || '',
+        }));
       })
       .catch(() => setError('No se pudo cargar la cita.'))
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Load existing medical record
+  // Load existing medical record + consent
   useEffect(() => {
     if (!appt?.medical_record_id) return;
     setLoadingRec(true);
@@ -136,6 +165,20 @@ export function AppointmentComplete() {
       })
       .finally(() => setLoadingRec(false));
   }, [appt?.medical_record_id]);
+
+  // Load existing consent (independiente de medical_record_id)
+  useEffect(() => {
+    if (!appt?.id) return;
+    apiFetch(`/api/appointments/${appt.id}/consent/`)
+      .then(r => r.json())
+      .then(d => {
+        const existing = d.consents?.[0];
+        if (existing?.signed_at) {
+          setConsentData({ signed_by_name: existing.signed_by_name, signature_image: existing.signature_image || '' });
+        }
+      })
+      .catch(() => {});
+  }, [appt?.id]);
 
   // Load medical record for photos when mrId is known
   useEffect(() => {
@@ -159,48 +202,55 @@ export function AppointmentComplete() {
       setSaveError('El diagnóstico es obligatorio para completar la cita.');
       return;
     }
+
+    // Validaciones de consent en frontend antes de enviar
+    const wantsConsent = needsConsent(appt.status, appt.treatment_requires_consent, appt.treatment_id);
+    if (wantsConsent) {
+      if (!consentForm.signed_by_name.trim()) {
+        setSaveError('El nombre del firmante es obligatorio para el consentimiento.');
+        return;
+      }
+      if (!consentForm.signature_data_url) {
+        setSaveError('La firma del consentimiento es obligatoria para completar la cita.');
+        return;
+      }
+    }
+
     setSaving(true); setSaveError('');
     try {
-      let mrId = appt.medical_record_id;
-
-      // If PENDING, transition to IN_PROGRESS first (auto-creates MedicalRecord)
+      // Si PENDING, transicionar a IN_PROGRESS primero (crea MR en backend)
       if (appt.status === 'PENDING') {
         const r = await apiFetch(`/api/appointments/${appt.id}/`, {
           method: 'PATCH', body: JSON.stringify({ status: 'IN_PROGRESS' }),
         });
         const rData = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(rData.detail || 'Error al iniciar consulta');
-        mrId = rData.appointment?.medical_record_id ?? mrId;
-        if (mrId) setMrId(mrId);
+        const newMrId = rData.appointment?.medical_record_id;
+        if (newMrId) setMrId(newMrId);
       }
 
-      // If still no mrId, re-fetch
-      if (!mrId) {
-        const freshRes = await apiFetch(`/api/appointments/${appt.id}/`);
-        const freshData = await freshRes.json();
-        mrId = freshData.appointment?.medical_record_id;
+      // Llamada atómica: guarda MR + consent + marca COMPLETED en una transacción
+      const body: Record<string, unknown> = { medical_record: form };
+      if (wantsConsent) {
+        body.consent = {
+          procedure_description: consentForm.procedure_description,
+          risks: consentForm.risks,
+          signed_by_name: consentForm.signed_by_name,
+          signature_image: consentForm.signature_data_url,
+        };
       }
-      if (!mrId) throw new Error('No se pudo obtener la historia clínica.');
 
-      // Save medical record
-      const mr = await apiFetch(`/api/medical-records/${mrId}/`, {
-        method: 'PUT', body: JSON.stringify(form),
+      const resp = await apiFetch(`/api/appointments/${appt.id}/complete/`, {
+        method: 'POST', body: JSON.stringify(body),
       });
-      if (!mr.ok) throw new Error((await mr.json().catch(() => ({}))).detail || 'Error al guardar historia clínica');
-
-      // Complete appointment
-      const c = await apiFetch(`/api/appointments/${appt.id}/`, {
-        method: 'PATCH', body: JSON.stringify({ status: 'COMPLETED' }),
-      });
-      if (!c.ok) throw new Error((await c.json().catch(() => ({}))).detail || 'Error al completar cita');
+      if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || 'Error al completar cita');
 
       setSaved(true);
-      // Redirect after short delay
       setTimeout(() => navigate('/admin/appointments'), 1500);
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : 'Error');
     } finally { setSaving(false); }
-  }, [appt, form, navigate]);
+  }, [appt, form, navigate, consentForm, needsConsent]);
 
   // Save draft (without completing)
   const handleSaveDraft = useCallback(async () => {
@@ -242,7 +292,7 @@ export function AppointmentComplete() {
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : 'Error');
     } finally { setSaving(false); }
-  }, [appt, form]);
+  }, [appt, form, config]);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -269,6 +319,9 @@ export function AppointmentComplete() {
   const isReadOnly = ['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(appt.status);
   const canComplete = ['PENDING', 'IN_PROGRESS'].includes(appt.status);
   const st = STATUS_LABELS[appt.status] ?? { label: appt.status, color: 'bg-gray-100 text-gray-600' };
+
+  const showConsent = needsConsent(appt.status, appt.treatment_requires_consent, appt.treatment_id);
+  const showConsentReadOnly = isReadOnly && !!consentData;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -421,6 +474,53 @@ export function AppointmentComplete() {
                 />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Consentimiento Informado */}
+        {(showConsent || showConsentReadOnly) && (
+          <div className="border-t border-gray-100 px-5 py-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <FileSignature className="w-5 h-5 text-indigo-600" />
+              <h3 className="text-base font-semibold text-gray-900">Consentimiento Informado</h3>
+            </div>
+
+            {showConsentReadOnly && consentData ? (
+              <>
+                <p className="text-sm text-gray-600">Firmado por: {consentData.signed_by_name}</p>
+                {consentData.signature_image && (
+                  <img src={consentData.signature_image} alt="Firma" className="border rounded-lg max-h-32" />
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Descripción del procedimiento</label>
+                  <textarea rows={2} value={consentForm.procedure_description}
+                    onChange={e => setConsentForm(p => ({ ...p, procedure_description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Riesgos y consideraciones</label>
+                  <textarea rows={2} value={consentForm.risks}
+                    onChange={e => setConsentForm(p => ({ ...p, risks: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Firmante <span className="text-red-500">*</span></label>
+                  <input value={consentForm.signed_by_name}
+                    onChange={e => setConsentForm(p => ({ ...p, signed_by_name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-gray-700">Firma <span className="text-red-500">*</span></label>
+                  <SignatureCanvas
+                    onSign={dataUrl => setConsentForm(p => ({ ...p, signature_data_url: dataUrl }))}
+                    onClear={() => setConsentForm(p => ({ ...p, signature_data_url: '' }))}
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
 
