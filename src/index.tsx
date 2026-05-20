@@ -14,7 +14,9 @@ import { AppointmentComplete } from './pages/admin/AppointmentComplete';
 import { DoctorsAdmin } from './pages/admin/DoctorsAdmin';
 import { DoctorProfile } from './pages/admin/DoctorProfile';
 import { ConsentsAdmin } from './pages/admin/ConsentsAdmin';
+import { ConsentDetail } from './pages/admin/ConsentDetail';
 import { MedicalRecordsAdmin } from './pages/admin/MedicalRecordsAdmin';
+import { MedicalRecordDetail } from './pages/admin/MedicalRecordDetail';
 import { PatientsAdmin } from './pages/admin/PatientsAdmin';
 import { PatientProfile } from './pages/admin/PatientProfile';
 import { RevenueAdmin } from './pages/admin/RevenueAdmin';
@@ -73,7 +75,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="patients" element={<PatientsAdmin />} />
             <Route path="patients/:id" element={<PatientProfile />} />
             <Route path="medical-records" element={<MedicalRecordsAdmin />} />
+            <Route path="medical-records/:id" element={<MedicalRecordDetail />} />
             <Route path="consents" element={<ConsentsAdmin />} />
+            <Route path="consents/:id" element={<ConsentDetail />} />
             <Route path="settings">
               <Route index element={<Navigate to="account" replace />} />
               <Route path="account" element={<SettingsLayout title="Mi Cuenta"><AccountSettings /></SettingsLayout>} />
