@@ -157,11 +157,14 @@ const sections: { title: string; fields: FieldDef[] }[] = [
 
 export function LandingEditor() {
   const [data, setData] = useState<LandingData>({});
+  const [originalData, setOriginalData] = useState<LandingData>({}); // Para comparar cambios
   const [files, setFiles] = useState<Record<string, File>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set()); // Campos modificados
+  const [savingFields, setSavingFields] = useState<Set<string>>(new Set()); // Campos guardándose
 
   useEffect(() => {
     apiFetch('/api/landing/')
@@ -169,6 +172,7 @@ export function LandingEditor() {
         if (!res.ok) throw new Error('Failed to load');
         const json = await res.json();
         setData(json.landing || {});
+        setOriginalData(json.landing || {}); // Guardar estado original
       })
       .catch(() => setError('No se pudo cargar la configuración'))
       .finally(() => setLoading(false));
@@ -176,6 +180,7 @@ export function LandingEditor() {
 
   const handleChange = (key: string, value: unknown) => {
     setData((prev) => ({ ...prev, [key]: value }));
+    setDirtyFields((prev) => new Set(prev).add(key)); // Marcar campo como modificado
     setSaved(false);
   };
 
@@ -183,7 +188,44 @@ export function LandingEditor() {
     const file = e.target.files?.[0];
     if (file) {
       setFiles((prev) => ({ ...prev, [key]: file }));
+      setDirtyFields((prev) => new Set(prev).add(key)); // Marcar campo como modificado
       setSaved(false);
+    }
+  };
+
+  // Función para guardar un campo individual (auto-save)
+  const saveField = async (key: string) => {
+    if (!dirtyFields.has(key)) return; // No guardar si no hay cambios
+    
+    setSavingFields((prev) => new Set(prev).add(key));
+    try {
+      const value = data[key];
+      const body: Record<string, unknown> = {};
+      body[key] = value;
+      
+      const res = await apiFetch('/api/landing/', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Error');
+      
+      const json = await res.json();
+      setData(json.landing || {});
+      setOriginalData((prev) => ({ ...prev, [key]: value })); // Actualizar original
+      setDirtyFields((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    } catch (err) {
+      console.error('Error saving field:', err);
+    } finally {
+      setSavingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
@@ -232,6 +274,7 @@ export function LandingEditor() {
         setData(json.landing || {});
       }
       setFiles({});
+      setDirtyFields(new Set()); // Limpiar todos los dirty fields
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
@@ -254,10 +297,11 @@ export function LandingEditor() {
       <div className="flex items-center justify-between mb-8">
         <p className="text-gray-500">Personaliza el contenido de tu página de inicio</p>
         <a
-          href="/"
+          href={`//${window.location.host}/`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          title={`Ver landing en ${window.location.host}`}
         >
           Ver landing <ExternalLink className="w-4 h-4" />
         </a>
