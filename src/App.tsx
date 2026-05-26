@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState  } from 'react';
+import { ComingSoon } from './components/ComingSoon';
 import { Hero } from './components/Hero';
 import { Services } from './components/Services';
 import { About } from './components/About';
@@ -64,6 +65,8 @@ export function App() {
   const [appointmentOpen, setAppointmentOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [landingData, setLandingData] = useState<LandingPayload | null>(null);
+  const [loadingLanding, setLoadingLanding] = useState(true);
+  const [isPublished, setIsPublished] = useState<boolean | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -94,16 +97,26 @@ export function App() {
   const landingEndpoint = `${String(apiBase).replace(/\/$/, '')}/public/landing/`;
 
   useEffect(() => {
+    setLoadingLanding(true);
     fetch(landingEndpoint, { method: 'GET' })
       .then(async (res) => {
+        if (res.status === 404) {
+          setIsPublished(false);
+          return;
+        }
         const data = (await res.json().catch(() => null)) as LandingPayload | null;
-        console.log('Landing data received:', data);
-        if (!res.ok) return;
-        if (!data) return;
+        if (!res.ok || !data) {
+          setIsPublished(true);
+          return;
+        }
         setLandingData(data);
+        setIsPublished(true);
       })
-      .catch((err) => {
-        console.error('Landing fetch error:', err);
+      .catch(() => {
+        setIsPublished(true);
+      })
+      .finally(() => {
+        setLoadingLanding(false);
       });
   }, [landingEndpoint]);
 
@@ -177,6 +190,19 @@ export function App() {
       const el = document.querySelector(href);
       el?.scrollIntoView({ behavior: 'smooth' });
     }, 150);
+  }
+
+  if (loadingLanding) {
+    return <div className="min-h-screen bg-[#F5F5F3]" />;
+  }
+
+  if (isPublished === false) {
+    return (
+      <ComingSoon
+        clinicName={landingData?.clinic?.name}
+        logoUrl={landingData?.clinic?.logo_url}
+      />
+    );
   }
 
   return (
