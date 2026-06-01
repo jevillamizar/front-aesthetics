@@ -50,6 +50,7 @@ type Props = {
   onClose: () => void;
   onCreated?: () => void;
   defaultDate?: string;
+  defaultDoctorId?: number;
   forceProcedimiento?: boolean;
   defaultPatientId?: number;
   defaultPatientName?: string;
@@ -57,7 +58,7 @@ type Props = {
 
 /* ── Component ─────────────────────────────────────────────────────── */
 
-export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, defaultPatientId, defaultPatientName }: Props) {
+export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, defaultPatientId, defaultPatientName, defaultDate, defaultDoctorId }: Props) {
   /* meta */
   const [patients, setPatients]     = useState<Patient[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
@@ -71,7 +72,7 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
   const [apptType, setApptType]       = useState<ApptType>('PROCEDIMIENTO');
   const [patientId, setPatientId]     = useState<number | ''>(defaultPatientId ?? '');
   const [treatmentId, setTreatmentId] = useState<number | ''>('');
-  const [doctorId, setDoctorId]       = useState<number | ''>('');
+  const [doctorId, setDoctorId]       = useState<number | ''>(defaultDoctorId ?? '');
   const [duration, setDuration]       = useState(60);
   const [notes, setNotes]             = useState('');
   const [showNewPat, setShowNewPat]   = useState(false);
@@ -79,10 +80,30 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
   const [creatingPat, setCreatingPat] = useState(false);
   const [patError, setPatError]       = useState('');
 
-  /* step 2 — fecha/slot */
+  /* step 2 — fecha/slot
+   * Nota: today se calcula dentro de cada initializer para evitar stale closure
+   * si el componente se monta cerca del cambio de fecha (23:59:59 -> 00:00:00)
+   */
+  const [selDate, setSelDate]   = useState<Date>(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (defaultDate) {
+      const parsed = new Date(defaultDate + 'T00:00:00');
+      if (!isNaN(parsed.getTime()) && parsed >= today) return parsed;
+    }
+    return today;
+  });
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (defaultDate) {
+      const parsed = new Date(defaultDate + 'T00:00:00');
+      if (!isNaN(parsed.getTime()) && parsed >= today) return parsed;
+    }
+    return today;
+  });
+
+  /* today para validaciones en render (no afecta estado inicial ya establecido) */
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const [selDate, setSelDate]   = useState<Date>(() => today);
-  const [weekStart, setWeekStart] = useState<Date>(() => today);
+
   const [slots, setSlots]       = useState<Slot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selSlot, setSelSlot]   = useState<Slot | null>(null);
@@ -210,7 +231,7 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
 
@@ -490,7 +511,11 @@ export function NewAppointmentModal({ onClose, onCreated, forceProcedimiento, de
                   <span className="text-gray-900 font-medium">{apptType === 'VALORACION' ? 'Valoración' : 'Procedimiento'}</span>
 
                   <span className="text-xs text-gray-400 uppercase tracking-wide">Paciente</span>
-                  <span className="text-gray-900 font-medium">{selPatient ? `${selPatient.first_name} ${selPatient.last_name}` : '—'}</span>
+                  <span className="text-gray-900 font-medium">
+                    {selPatient
+                      ? `${selPatient.first_name} ${selPatient.last_name}`
+                      : defaultPatientName ?? '—'}
+                  </span>
 
                   {apptType === 'PROCEDIMIENTO' && selTreatment && (
                     <>

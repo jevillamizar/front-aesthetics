@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
 import { AtenderModal } from '../../components/AtenderModal';
+import { NewAppointmentModal } from '../../components/NewAppointmentModal';
 import {
   CalendarDays, Loader2,
   ChevronLeft, ChevronRight,
+  Plus,
 } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -310,6 +312,7 @@ export function Agenda() {
   const [filterTreatment, setFilterTreatment] = useState<string>('');
 
   const [atenderApptId, setAtenderApptId] = useState<number | null>(null);
+  const [showNewAppt, setShowNewAppt] = useState(false);
 
   useEffect(() => {
     if (!isDoctor) {
@@ -414,6 +417,13 @@ export function Agenda() {
             {isDoctor ? 'Tu agenda personal' : 'Vista general de la clínica'}
           </p>
         </div>
+        {user?.role === 'ADMIN' && (
+          <button
+            onClick={() => setShowNewAppt(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
+            <Plus className="w-4 h-4" /> Nueva Cita
+          </button>
+        )}
       </div>
 
       {/* Filters - Mobile: full width, stacked / Desktop: inline */}
@@ -557,6 +567,15 @@ export function Agenda() {
         onClose={() => setAtenderApptId(null)}
         onDone={handleDone}
       />
+
+      {showNewAppt && (
+        <NewAppointmentModal
+          onClose={() => setShowNewAppt(false)}
+          onCreated={handleDone}
+          defaultDate={isoDate(date)}
+          defaultDoctorId={filterDoctor ? Number(filterDoctor) : undefined}
+        />
+      )}
     </div>
   );
 }

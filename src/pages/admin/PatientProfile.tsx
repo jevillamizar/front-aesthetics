@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import {
   ArrowLeft, CalendarDays, Camera, ChevronLeft, ChevronRight, ClipboardList,
   FileText, Loader2, Mail, MapPin, Minus, Pencil, Phone, Plus, RotateCcw, User, X,
 } from 'lucide-react';
 import { PatientModal } from '../../components/PatientModal';
+import { NewAppointmentModal } from '../../components/NewAppointmentModal';
 
 import type { Patient } from '../../components/PatientModal';
 
@@ -100,6 +102,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 export function PatientProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -114,6 +117,7 @@ export function PatientProfile() {
   const [tab, setTab] = useState<'records' | 'appointments'>('records');
 
   const [showEdit, setShowEdit] = useState(false);
+  const [showNewAppt, setShowNewAppt] = useState(false);
 
   /* Photo-only upload state */
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -250,6 +254,13 @@ export function PatientProfile() {
                   <div><p className="text-base font-bold text-gray-900">{appointments.length}</p><p className="text-xs text-gray-400">Citas</p></div>
                   {totalRevenue > 0 && <div><p className="text-base font-bold text-gray-900">{fmtCurrency(totalRevenue)}</p><p className="text-xs text-gray-400">Facturado</p></div>}
                 </div>
+                {user?.role === 'ADMIN' && (
+                  <button
+                    onClick={() => setShowNewAppt(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+                    <CalendarDays className="w-3 h-3" /> Agendar Cita
+                  </button>
+                )}
                 <button onClick={openEdit}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <Pencil className="w-3 h-3" /> Editar
@@ -259,6 +270,15 @@ export function PatientProfile() {
                     patient={patient}
                     onClose={() => setShowEdit(false)}
                     onSaved={(updated) => { setPatient(updated); setShowEdit(false); }}
+                  />
+                )}
+                {showNewAppt && patient && (
+                  <NewAppointmentModal
+                    onClose={() => setShowNewAppt(false)}
+                    onCreated={() => { if (id) reload(id); }}
+                    defaultPatientId={patient.id}
+                    defaultPatientName={`${patient.first_name} ${patient.last_name}`.trim()}
+                    forceProcedimiento
                   />
                 )}
               </div>
