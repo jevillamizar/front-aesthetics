@@ -19,7 +19,6 @@ import {
   UserCircle,
   Building2,
   LayoutDashboard,
-  Palette,
   Scissors,
 } from 'lucide-react';
 
@@ -163,7 +162,6 @@ export function AdminLayout() {
                   {[
                     { to: '/admin/settings/account',       icon: UserCircle,     label: 'Mi Cuenta' },
                     { to: '/admin/settings/clinic',        icon: Building2,      label: 'Datos de la Clínica' },
-                    { to: '/admin/settings/landing',       icon: Palette,        label: 'Landing Page' },
                     { to: '/admin/settings/treatments',    icon: Scissors,       label: 'Procedimientos' },
                     { to: '/admin/settings/gcal',          icon: CalendarDays,     label: 'Google Calendar' },
                     //{ to: '/admin/settings/notifications', icon: Bell,           label: 'Notificaciones' },

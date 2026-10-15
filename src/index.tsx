@@ -23,7 +23,7 @@ import { RevenueAdmin } from './pages/admin/RevenueAdmin';
 import { TreatmentsAdmin } from './pages/admin/TreatmentsAdmin';
 import { AccountSettings } from './pages/admin/AccountSettings';
 import { ClinicSettings } from './pages/admin/ClinicSettings';
-import { LandingEditor } from './pages/admin/LandingEditor';
+// import { LandingEditor } from './pages/admin/LandingEditor'; // Oculto en MVP: agendamiento y notificaciones
 import { GoogleCalendarSettings } from './pages/admin/GoogleCalendarSettings';
 import { SettingsLayout } from './pages/admin/Settings';
 import { AvailabilityPage } from './pages/AvailabilityPage';
@@ -82,7 +82,7 @@ createRoot(document.getElementById('root')!).render(
               <Route index element={<Navigate to="account" replace />} />
               <Route path="account" element={<SettingsLayout title="Mi Cuenta"><AccountSettings /></SettingsLayout>} />
               <Route path="clinic" element={<SettingsLayout title="Datos de la Clínica"><ClinicSettings /></SettingsLayout>} />
-              <Route path="landing" element={<SettingsLayout title="Landing Page"><LandingEditor /></SettingsLayout>} />
+              <Route path="landing" element={<Navigate to="/admin/settings/clinic" replace />} />
               <Route path="treatments" element={<SettingsLayout title="Procedimientos"><TreatmentsAdmin /></SettingsLayout>} />
               <Route path="gcal" element={<SettingsLayout title="Google Calendar"><GoogleCalendarSettings /></SettingsLayout>} />
               <Route path="notifications" element={<SettingsLayout title="Notificaciones"><NotificationsPlaceholder /></SettingsLayout>} />
